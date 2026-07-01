@@ -3,6 +3,8 @@ import { monthStart, weekStart } from '../utils/dates.js';
 import { refreshOverdueLoans } from './loanService.js';
 
 export async function treasurerDashboard() {
+  await refreshOverdueLoans();
+
   const today = new Date();
   const { rows } = await query(
     `SELECT
@@ -19,6 +21,8 @@ export async function treasurerDashboard() {
 }
 
 export async function chairmanDashboard() {
+  await refreshOverdueLoans();
+
   const today = new Date();
   const { rows } = await query(
     `SELECT
@@ -127,13 +131,15 @@ export async function topSavers() {
 }
 
 export async function defaulters() {
+  await refreshOverdueLoans();
+
   const { rows } = await query(
     `SELECT m.full_name, m.member_number, l.due_date,
             GREATEST(l.total_payable - COALESCE(SUM(r.amount), 0), 0) AS balance
      FROM loans l
      JOIN members m ON m.id = l.member_id
      LEFT JOIN loan_repayments r ON r.loan_id = l.id
-     WHERE l.status = 'overdue'
+     WHERE l.status = 'overdue' OR (l.status = 'active' AND l.due_date < CURRENT_DATE)
      GROUP BY l.id, m.full_name, m.member_number
      ORDER BY balance DESC`,
   );
