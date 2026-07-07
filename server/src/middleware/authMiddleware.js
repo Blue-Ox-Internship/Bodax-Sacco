@@ -19,6 +19,7 @@ export async function authenticate(req, _res, next) {
     }
 
     req.user = user;
+    req.saccoId = user.sacco_id;
     next();
   } catch (error) {
     next(error.name === 'JsonWebTokenError' ? new AppError('Invalid token', 401) : error);

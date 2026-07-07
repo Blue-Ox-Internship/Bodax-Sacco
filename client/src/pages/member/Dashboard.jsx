@@ -55,10 +55,6 @@ export default function MemberDashboard() {
     errorMessage: 'Failed to load member dashboard',
   });
 
-  useEffect(() => {
-    const interval = setInterval(onRetry, 5000);
-    return () => clearInterval(interval);
-  }, [onRetry]);
 
   useEffect(() => {
     function handleVisibilityChange() {
@@ -102,7 +98,7 @@ export default function MemberDashboard() {
         )}
 
         <p className="text-muted" style={{ fontSize: '0.875rem' }}>
-          Last updated: {lastUpdated.toLocaleTimeString()} (Auto-refreshes every 5 seconds)
+          Last updated: {lastUpdated.toLocaleTimeString()}
         </p>
 
         {data.latest_savings_notification?.amount && (

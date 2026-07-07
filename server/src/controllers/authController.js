@@ -1,4 +1,4 @@
-import { changePassword, login, register } from '../services/authService.js';
+import { changePassword, login, requestPasswordReset } from '../services/authService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const loginController = asyncHandler(async (req, res) => {
@@ -7,9 +7,11 @@ export const loginController = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
-export const signupController = asyncHandler(async (req, res) => {
-  const result = await register(req.validated.body);
-  res.status(201).json(result);
+export const forgotPasswordController = asyncHandler(async (req, res) => {
+  const identifier = req.body.identifier;
+  if (!identifier) return res.status(400).json({ message: 'Identifier is required' });
+  await requestPasswordReset(identifier);
+  res.json({ message: 'Password reset request submitted successfully' });
 });
 
 export const meController = asyncHandler(async (req, res) => {

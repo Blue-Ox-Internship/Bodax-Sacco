@@ -3,11 +3,12 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { query } from '../config/db.js';
 import { AppError } from '../utils/AppError.js';
+import { createNotification } from './notificationService.js';
 import * as memberService from './memberService.js';
 
 const userSelect = `
-  SELECT u.id, u.email, u.password_hash, u.is_active, r.code AS role_code, r.name AS role_name,
-         m.id AS member_id, m.full_name, m.member_number
+  SELECT u.id, u.sacco_id, u.email, u.password_hash, u.is_active, r.code AS role_code, r.name AS role_name,
+         m.id AS member_id, m.full_name, m.member_number, m.phone_number, m.number_plate
   FROM users u
   JOIN roles r ON r.id = u.role_id
   LEFT JOIN members m ON m.user_id = u.id
@@ -19,12 +20,25 @@ export async function getUserById(id) {
 }
 
 export async function login(identifier, password) {
-  const value = identifier.trim();
+  // Normalize identifier
+  let value = identifier.trim().toLowerCase();
+  
+  // Strip all spaces for number plate matching (e.g. "UBC 123A" -> "ubc123a")
+  const strippedValue = value.replace(/\s+/g, '');
+  
+  // Very basic phone normalization (replace leading 0 with +256)
+  let phoneValue = value;
+  if (phoneValue.startsWith('0')) {
+    phoneValue = '+256' + phoneValue.slice(1);
+  }
+  phoneValue = phoneValue.replace(/\s+/g, '');
+
   const { rows } = await query(
     `${userSelect}
-     WHERE lower(u.email) = lower($1)
-        OR m.phone_number = $1`,
-    [value],
+     WHERE lower(u.email) = $1
+        OR m.phone_number = $2
+        OR lower(replace(m.number_plate, ' ', '')) = $3`,
+    [value, phoneValue, strippedValue],
   );
   const user = rows[0];
 
@@ -41,19 +55,60 @@ export async function login(identifier, password) {
   await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
 
   const token = jwt.sign(
-    { sub: user.id, role: user.role_code, memberId: user.member_id },
+    { sub: user.id, role: user.role_code, memberId: user.member_id, saccoId: user.sacco_id },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn },
   );
+
+  if (user.role_code === 'TREASURER') {
+    // Notify Chairman
+    const { rows: chairmen } = await query(
+      `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE u.sacco_id = $1 AND r.code = 'CHAIRMAN'`,
+      [user.sacco_id]
+    );
+    if (chairmen.length > 0) {
+      await createNotification(
+        user.sacco_id, 
+        chairmen[0].id, 
+        'Treasurer Logged In', 
+        `The treasurer (${user.email}) has just logged into the system.`,
+        'security'
+      );
+    }
+  }
 
   delete user.password_hash;
   return { token, user };
 }
 
-export async function register(payload) {
-  await memberService.createMember(payload);
-  const identifier = payload.email?.trim() || payload.phone_number.trim();
-  return login(identifier, payload.password);
+export async function requestPasswordReset(identifier) {
+  let value = identifier.trim().toLowerCase();
+  const strippedValue = value.replace(/\s+/g, '');
+  let phoneValue = value;
+  if (phoneValue.startsWith('0')) {
+    phoneValue = '+256' + phoneValue.slice(1);
+  }
+  phoneValue = phoneValue.replace(/\s+/g, '');
+
+  const { rows } = await query(
+    `${userSelect}
+     WHERE lower(u.email) = $1
+        OR m.phone_number = $2
+        OR lower(replace(m.number_plate, ' ', '')) = $3`,
+    [value, phoneValue, strippedValue],
+  );
+  const user = rows[0];
+
+  if (!user || !user.member_id) {
+    throw new AppError('Member not found. Please contact the Treasurer.', 404);
+  }
+
+  // Insert reset request
+  await query(
+    `INSERT INTO password_reset_requests (sacco_id, member_id, status)
+     VALUES ($1, $2, 'pending')`,
+    [user.sacco_id, user.member_id]
+  );
 }
 
 export async function changePassword(userId, currentPassword, newPassword) {

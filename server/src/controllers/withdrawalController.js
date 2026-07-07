@@ -6,17 +6,18 @@ export const createWithdrawalRequest = asyncHandler(async (req, res) => {
     req.user.role_code === 'MEMBER'
       ? { ...req.validated.body, member_id: req.user.member_id }
       : req.validated.body;
-  res.status(201).json(await withdrawalService.createWithdrawalRequest(payload));
+  res.status(201).json(await withdrawalService.createWithdrawalRequest(req.saccoId, payload));
 });
 
 export const listWithdrawalRequests = asyncHandler(async (req, res) => {
   const memberId = req.user.role_code === 'MEMBER' ? req.user.member_id : req.query.member_id;
-  res.json(await withdrawalService.listWithdrawalRequests({ status: req.query.status, memberId }));
+  res.json(await withdrawalService.listWithdrawalRequests({ saccoId: req.saccoId, status: req.query.status, memberId }));
 });
 
 export const reviewWithdrawalRequest = asyncHandler(async (req, res) => {
   res.json(
     await withdrawalService.reviewWithdrawalRequest(
+      req.saccoId,
       req.validated.params.id,
       req.validated.body.action,
       req.user.id,

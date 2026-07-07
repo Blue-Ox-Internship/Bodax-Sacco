@@ -180,7 +180,7 @@ select {
 
 .sidebar a,
 .logout {
-  min-height: 40px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
@@ -561,6 +561,16 @@ tr:last-child td {
 }
 
 /* Status Badges */
+button,
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+}
+
 .status {
   display: inline-flex;
   align-items: center;

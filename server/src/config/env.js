@@ -23,6 +23,7 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET || 'development-only-secret-change-me',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  superAdminSecret: process.env.SUPER_ADMIN_SECRET || 'super-admin-dev-secret-123',
 };
 
 if (!env.databaseUrl && env.nodeEnv === 'production') {

@@ -2,7 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './layouts/AppLayout.jsx';
 import ProtectedRoute from './layouts/ProtectedRoute.jsx';
 import Login from './pages/auth/Login.jsx';
-import Signup from './pages/auth/Signup.jsx';
+import ForgotPassword from './pages/auth/ForgotPassword.jsx';
+import SuperAdminRoot from './pages/admin/Root.jsx';
 import ChairmanAnalytics from './pages/chairman/Analytics.jsx';
 import ChairmanDashboard from './pages/chairman/Dashboard.jsx';
 import ChairmanReports from './pages/chairman/Reports.jsx';
@@ -11,6 +12,7 @@ import MemberLoans from './pages/member/Loans.jsx';
 import Profile from './pages/member/Profile.jsx';
 import MemberStatements from './pages/member/Statements.jsx';
 import WithdrawRequest from './pages/member/WithdrawRequest.jsx';
+import NotifyDeposit from './pages/member/NotifyDeposit.jsx';
 import TreasurerDashboard from './pages/treasurer/Dashboard.jsx';
 import TreasurerLoans from './pages/treasurer/Loans.jsx';
 import Members from './pages/treasurer/Members.jsx';
@@ -19,6 +21,7 @@ import ConfirmDeposits from './pages/treasurer/ConfirmDeposits.jsx';
 import ConfirmLoans from './pages/treasurer/ConfirmLoans.jsx';
 import TreasurerReports from './pages/treasurer/Reports.jsx';
 import Withdrawals from './pages/treasurer/Withdrawals.jsx';
+import Notifications from './pages/Notifications.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 
 function HomeRedirect() {
@@ -33,7 +36,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/admin/root" element={<SuperAdminRoot />} />
       <Route
         path="/"
         element={
@@ -47,6 +51,7 @@ export default function App() {
         <Route path="member/statements" element={<ProtectedRoute roles={['MEMBER']}><MemberStatements /></ProtectedRoute>} />
         <Route path="member/profile" element={<ProtectedRoute roles={['MEMBER']}><Profile /></ProtectedRoute>} />
         <Route path="member/withdraw" element={<ProtectedRoute roles={['MEMBER']}><WithdrawRequest /></ProtectedRoute>} />
+        <Route path="member/notify-deposit" element={<ProtectedRoute roles={['MEMBER']}><NotifyDeposit /></ProtectedRoute>} />
         <Route path="treasurer/members" element={<ProtectedRoute roles={['TREASURER']}><Members /></ProtectedRoute>} />
         <Route path="treasurer/savings" element={<ProtectedRoute roles={['TREASURER']}><RecordSavings /></ProtectedRoute>} />
         <Route path="treasurer/confirm-deposits" element={<ProtectedRoute roles={['TREASURER']}><ConfirmDeposits /></ProtectedRoute>} />
@@ -56,7 +61,9 @@ export default function App() {
         <Route path="treasurer/reports" element={<ProtectedRoute roles={['TREASURER']}><TreasurerReports /></ProtectedRoute>} />
         <Route path="chairman/analytics" element={<ProtectedRoute roles={['CHAIRMAN']}><ChairmanAnalytics /></ProtectedRoute>} />
         <Route path="chairman/reports" element={<ProtectedRoute roles={['CHAIRMAN']}><ChairmanReports /></ProtectedRoute>} />
+        <Route path="notifications" element={<ProtectedRoute roles={['MEMBER', 'TREASURER', 'CHAIRMAN']}><Notifications /></ProtectedRoute>} />
       </Route>
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }

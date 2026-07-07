@@ -35,15 +35,15 @@ export default function Login() {
         </div>
         {error && <p className="alert">{error}</p>}
         <div>
-          <FormField label="Phone number or email" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
-          <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '-8px', marginBottom: '16px' }}>Use your phone number or email</p>
+          <FormField label="Phone number, Email or Number Plate" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '-8px', marginBottom: '16px' }}>e.g. 077XXXXXXX or UAB 123C</p>
         </div>
         <FormField label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
         <Button type="submit" disabled={loading}>
           {loading ? 'Signing in...' : 'Sign in'}
         </Button>
         <p className="secondary-action">
-          New here? <Link to="/signup">Create an account</Link>
+          <Link to="/forgot-password">Forgot Password?</Link>
         </p>
       </form>
     </main>
