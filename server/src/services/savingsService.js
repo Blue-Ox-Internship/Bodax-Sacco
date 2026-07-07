@@ -62,6 +62,7 @@ export async function statement(saccoId, memberId, from, to) {
      FROM withdrawals WHERE sacco_id = $1 AND member_id = $2 AND withdrawal_date BETWEEN $3 AND $4
      ORDER BY date DESC`,
     [saccoId, memberId, from, to],
+  );
   return rows;
 }
 
@@ -112,6 +113,6 @@ export async function reviewDepositNotification(saccoId, id, action, reviewedBy)
         [saccoId, notification.member_id, reviewedBy, notification.amount, `Approved Deposit Notif: ${notification.transaction_id || ''}`]
       );
     }
-    return { status, message: \`Deposit \${status}\` };
+    return { status, message: `Deposit ${status}` };
   });
 }

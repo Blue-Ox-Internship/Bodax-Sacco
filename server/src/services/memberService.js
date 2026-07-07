@@ -178,6 +178,6 @@ export async function reviewPasswordResetRequest(saccoId, requestId, action, rev
       await setMemberCredentials(saccoId, request.member_id, newPassword, client);
     }
 
-    return { status, message: \`Request \${status}\` };
+    return { status, message: `Request ${status}` };
   });
 }

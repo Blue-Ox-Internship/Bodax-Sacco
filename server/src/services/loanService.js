@@ -1,15 +1,6 @@
 import { query, transaction } from '../config/db.js';
 import { AppError } from '../utils/AppError.js';
 
-const LOAN_SAVINGS_MULTIPLIER = 3;
-
-function calculateLoan({ principal, interest_rate = 10, installment_count = 4 }) {
-  const interestAmount = Number(principal) * (Number(interest_rate) / 100);
-  const totalPayable = Number(principal) + interestAmount;
-  return {
-import { query, transaction } from '../config/db.js';
-import { AppError } from '../utils/AppError.js';
-
 export const ELIGIBILITY_RULES = {
   MIN_MEMBERSHIP_DAYS: 30, // Must be registered for at least 30 days
   MIN_SAVINGS_TRANSACTIONS: 3, // Must have saved at least 3 distinct times
@@ -43,16 +34,16 @@ export async function refreshOverdueLoans(saccoId) {
 
 export async function checkLoanEligibility(saccoId, memberId, requestedAmount = null, options = {}) {
   const memberResult = await query(
-    \`SELECT status, registration_date, 
+    `SELECT status, registration_date, 
             CURRENT_DATE - registration_date AS days_registered
-     FROM members WHERE sacco_id = $1 AND id = $2\`, 
+     FROM members WHERE sacco_id = $1 AND id = $2`, 
     [saccoId, memberId]
   );
   const member = memberResult.rows[0];
   if (!member) throw new AppError('Member not found', 404);
 
   const savingsResult = await query(
-    \`SELECT 
+    `SELECT 
        GREATEST(
          COALESCE((
            SELECT SUM(amount) FROM savings_transactions
@@ -67,7 +58,7 @@ export async function checkLoanEligibility(saccoId, memberId, requestedAmount = 
          SELECT COUNT(*) FROM savings_transactions
          WHERE sacco_id = $1 AND member_id = $2 AND confirmed = true
        ), 0) AS transaction_count
-    \`,
+    `,
     [saccoId, memberId],
   );
   const totalSavings = Number(savingsResult.rows[0].total);
@@ -75,11 +66,11 @@ export async function checkLoanEligibility(saccoId, memberId, requestedAmount = 
 
   // Analyze Repayment History
   const historyResult = await query(
-    \`SELECT 
+    `SELECT 
        COUNT(*) AS total_past_loans,
        COUNT(CASE WHEN (SELECT MAX(payment_date) FROM loan_repayments r WHERE r.loan_id = l.id) > l.due_date THEN 1 END) AS late_past_loans
      FROM loans l
-     WHERE l.sacco_id = $1 AND l.member_id = $2 AND l.status = 'completed'\`,
+     WHERE l.sacco_id = $1 AND l.member_id = $2 AND l.status = 'completed'`,
     [saccoId, memberId]
   );
   const pastLoans = Number(historyResult.rows[0].total_past_loans);
@@ -103,12 +94,12 @@ export async function checkLoanEligibility(saccoId, memberId, requestedAmount = 
 
   // Rule 2: Membership Duration
   if (member.days_registered < ELIGIBILITY_RULES.MIN_MEMBERSHIP_DAYS) {
-    return { eligible: false, reason: \`Must be a registered member for at least \${ELIGIBILITY_RULES.MIN_MEMBERSHIP_DAYS} days\`, max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+    return { eligible: false, reason: `Must be a registered member for at least ${ELIGIBILITY_RULES.MIN_MEMBERSHIP_DAYS} days`, max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
   }
 
   // Rule 3: Savings Consistency
   if (savingsTransactionsCount < ELIGIBILITY_RULES.MIN_SAVINGS_TRANSACTIONS) {
-    return { eligible: false, reason: \`Must have at least \${ELIGIBILITY_RULES.MIN_SAVINGS_TRANSACTIONS} confirmed savings transactions\`, max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+    return { eligible: false, reason: `Must have at least ${ELIGIBILITY_RULES.MIN_SAVINGS_TRANSACTIONS} confirmed savings transactions`, max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
   }
 
   // Rule 4: Total Savings
@@ -125,10 +116,10 @@ export async function checkLoanEligibility(saccoId, memberId, requestedAmount = 
 
   // Rule 6: Pending Requests
   const pendingParams = [saccoId, memberId];
-  let pendingSql = \`SELECT id FROM loan_requests WHERE sacco_id = $1 AND member_id = $2 AND status = 'pending'\`;
+  let pendingSql = `SELECT id FROM loan_requests WHERE sacco_id = $1 AND member_id = $2 AND status = 'pending'`;
   if (options.excludeRequestId) {
     pendingParams.push(options.excludeRequestId);
-    pendingSql += \` AND id <> $\${pendingParams.length}\`;
+    pendingSql += ` AND id <> $${pendingParams.length}`;
   }
   const pendingRequest = await query(pendingSql, pendingParams);
   if (pendingRequest.rows.length) {
@@ -137,12 +128,12 @@ export async function checkLoanEligibility(saccoId, memberId, requestedAmount = 
 
   // Rule 7: Requested Amount vs Max Eligible
   if (requestedAmount !== null && Number(requestedAmount) > maxEligible) {
-    return { eligible: false, reason: \`Requested amount exceeds your maximum eligible amount (\${maxEligible.toLocaleString()} UGX - \${currentMultiplier}x your confirmed savings)\`, max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+    return { eligible: false, reason: `Requested amount exceeds your maximum eligible amount (${maxEligible.toLocaleString()} UGX - ${currentMultiplier}x your confirmed savings)`, max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
   }
 
   return {
     eligible: true,
-    reason: \`Eligible to borrow up to \${maxEligible.toLocaleString()} UGX (\${currentMultiplier}x your confirmed savings)\`,
+    reason: `Eligible to borrow up to ${maxEligible.toLocaleString()} UGX (${currentMultiplier}x your confirmed savings)`,
     max_eligible_amount: maxEligible,
     total_savings: totalSavings,
     savings_multiplier: currentMultiplier,
