@@ -37,7 +37,6 @@
 
 * {
   box-sizing: border-box;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 body {
@@ -53,8 +52,28 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
+}
+
+/* Only animate interactive & color-themed elements — never the whole DOM tree */
+button,
+a,
+.btn,
+.stat-card,
+.panel,
+.notice-banner,
+.sidebar-link,
+.nav-item,
+input[type="text"],
+input[type="password"],
+input[type="tel"],
+input[type="date"],
+input[type="number"],
+select {
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
 /* Animations */
@@ -72,7 +91,7 @@ select {
 .page-stack {
   display: grid;
   gap: 24px;
-  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeInUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Login Screen Redesign */

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Panel, StatCard } from '../../components/Card.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { money } from '../../utils/format.js';
@@ -33,7 +34,7 @@ export default function TreasurerDashboard() {
               <strong>{data.pending_loan_requests} pending loan request{data.pending_loan_requests !== 1 ? 's' : ''}</strong>
               <p>A member has submitted a new loan request awaiting your review.</p>
             </div>
-            <a href="/treasurer/confirm-loans">Review now</a>
+            <Link to="/treasurer/confirm-loans">Review now</Link>
           </div>
         )}
 
@@ -70,11 +71,11 @@ export default function TreasurerDashboard() {
 
         <Panel title="Quick work">
           <div className="quick-grid">
-            <a href="/treasurer/savings">Record savings</a>
-            <a href="/treasurer/confirm-deposits">Confirm deposits</a>
-            <a href="/treasurer/confirm-loans">Confirm loans</a>
-            <a href="/treasurer/members">Register member</a>
-            <a href="/treasurer/loans">Issue loan</a>
+            <Link to="/treasurer/savings">Record savings</Link>
+            <Link to="/treasurer/confirm-deposits">Confirm deposits</Link>
+            <Link to="/treasurer/confirm-loans">Confirm loans</Link>
+            <Link to="/treasurer/members">Register member</Link>
+            <Link to="/treasurer/loans">Issue loan</Link>
           </div>
         </Panel>
       </div>

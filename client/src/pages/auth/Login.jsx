@@ -35,8 +35,7 @@ export default function Login() {
         </div>
         {error && <p className="alert">{error}</p>}
         <div>
-          <FormField label="Phone number, Email or Number Plate" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
-          <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '-8px', marginBottom: '16px' }}>e.g. 077XXXXXXX or UAB 123C</p>
+          <FormField label="Phone number or Number Plate" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
         </div>
         <FormField label="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
         <Button type="submit" disabled={loading}>

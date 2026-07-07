@@ -7,7 +7,7 @@ function requestMessage(error, fallback) {
 export function useDelayedAsync(loadFn, deps = [], options = {}) {
   const {
     immediate = true,
-    delay = 1000,
+    delay = 150,
     errorMessage = 'Failed to load data',
   } = options;
   const [loading, setLoading] = useState(false);

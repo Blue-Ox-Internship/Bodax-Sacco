@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import DataTable from '../../components/DataTable.jsx';
 import { Panel, StatCard } from '../../components/Card.jsx';
 import StatusBadge from '../../components/StatusBadge.jsx';
@@ -12,7 +13,6 @@ export default function MemberDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState({});
   const [statement, setStatement] = useState([]);
-  const [lastUpdated, setLastUpdated] = useState(new Date());
   const [showNotification, setShowNotification] = useState(false);
   const [notificationData, setNotificationData] = useState(null);
   const [overdueReminder, setOverdueReminder] = useState(null);
@@ -48,7 +48,6 @@ export default function MemberDashboard() {
     const to = new Date().toISOString().slice(0, 10);
     const { data: statementData } = await api.get(`/savings/statement?from=${from}&to=${to}`);
     setStatement(statementData);
-    setLastUpdated(new Date());
   }
 
   const { loading, error, onRetry } = useDelayedAsync(fetchDashboardData, [], {
@@ -148,7 +147,7 @@ export default function MemberDashboard() {
               ]}
             />
           ) : (
-            <p>No loan requests yet. <a href="/member/loans">Apply for a loan</a></p>
+            <p>No loan requests yet. <Link to="/member/loans">Apply for a loan</Link></p>
           )}
         </Panel>
 

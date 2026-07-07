@@ -10,10 +10,10 @@ export function useApi(path, fallback) {
     if (!path) return;
     let mounted = true;
     
-    // Delay setting loading state to true by 1 second
+    // Delay setting loading state slightly to avoid flicker on fast connections
     const loadingTimeout = setTimeout(() => {
       if (mounted) setLoading(true);
-    }, 1000);
+    }, 150);
 
     setError('');
     
