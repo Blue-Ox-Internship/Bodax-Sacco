@@ -134,14 +134,20 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE INDEX IF NOT EXISTS idx_members_member_number ON members(member_number);
 CREATE INDEX IF NOT EXISTS idx_members_phone_number ON members(phone_number);
+CREATE INDEX IF NOT EXISTS idx_members_user_id ON members(user_id);
 CREATE INDEX IF NOT EXISTS idx_savings_transaction_date ON savings_transactions(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_savings_member_date ON savings_transactions(member_id, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_savings_confirmed ON savings_transactions(confirmed, transaction_date);
 CREATE INDEX IF NOT EXISTS idx_loans_status ON loans(status);
 CREATE INDEX IF NOT EXISTS idx_loans_member_status ON loans(member_id, status);
+CREATE INDEX IF NOT EXISTS idx_loans_due_date ON loans(due_date, status);
 CREATE INDEX IF NOT EXISTS idx_repayments_payment_date ON loan_repayments(payment_date);
+CREATE INDEX IF NOT EXISTS idx_repayments_loan_id ON loan_repayments(loan_id);
+CREATE INDEX IF NOT EXISTS idx_repayments_member_id ON loan_repayments(member_id);
 CREATE INDEX IF NOT EXISTS idx_loan_requests_status ON loan_requests(status);
 CREATE INDEX IF NOT EXISTS idx_loan_requests_member ON loan_requests(member_id);
 CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON withdrawal_requests(status);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_member_id ON withdrawals(member_id);
 
 INSERT INTO roles (code, name)
 VALUES ('MEMBER', 'Member'), ('TREASURER', 'Treasurer'), ('CHAIRMAN', 'Chairman')
