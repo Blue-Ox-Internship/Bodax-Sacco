@@ -1,8 +1,17 @@
 import * as depositService from '../services/depositService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
+export const myDepositsController = asyncHandler(async (req, res) => {
+  const memberId = req.user.member_id || req.user.memberId;
+  if (!memberId) return res.status(400).json({ message: 'Member ID not found in user session' });
+  const result = await depositService.listMyDepositNotifications(req.saccoId, memberId);
+  res.json(result);
+});
+
 export const notifyDepositController = asyncHandler(async (req, res) => {
-  const result = await depositService.notifyDeposit(req.saccoId, req.user.member_id, req.validated.body);
+  const memberId = req.user.member_id || req.user.memberId;
+  if (!memberId) return res.status(400).json({ message: 'Member ID not found in user session' });
+  const result = await depositService.notifyDeposit(req.saccoId, memberId, req.validated.body);
   res.status(201).json(result);
 });
 

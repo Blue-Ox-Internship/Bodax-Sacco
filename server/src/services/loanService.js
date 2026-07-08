@@ -19,7 +19,17 @@ function calculateLoan({ principal, interest_rate = 10, installment_count = 4 })
   };
 }
 
+// Cache: track the last time we ran refreshOverdueLoans per sacco
+// so we don't run an UPDATE on every single request
+const _overdueRefreshCache = new Map();
+const OVERDUE_REFRESH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function refreshOverdueLoans(saccoId) {
+  const now = Date.now();
+  const lastRun = _overdueRefreshCache.get(saccoId) || 0;
+  if (now - lastRun < OVERDUE_REFRESH_TTL_MS) return; // skip if ran recently
+  _overdueRefreshCache.set(saccoId, now);
+
   await query(
     `UPDATE loans l SET status = 'overdue', updated_at = NOW()
      WHERE l.sacco_id = $1
@@ -107,11 +117,38 @@ export async function checkLoanEligibility(saccoId, memberId, requestedAmount = 
     return { eligible: false, reason: 'You need confirmed savings before applying for a loan', max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
   }
 
-  // Rule 5: Active Loans
-  const activeLoans = await listLoans({ saccoId, memberId });
-  const hasActiveLoan = activeLoans.some((loan) => ['active', 'overdue'].includes(loan.status));
-  if (hasActiveLoan) {
-    return { eligible: false, reason: 'You already have an active or overdue loan', max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+  // Rule 5: Active Loans — allow multiple if total outstanding is within limit
+  const activeLoansResult = await query(
+    `SELECT COALESCE(SUM(
+       l.total_payable - COALESCE(
+         (SELECT SUM(r.amount) FROM loan_repayments r WHERE r.loan_id = l.id AND r.sacco_id = $1), 0
+       )
+     ), 0) AS total_outstanding,
+     COUNT(CASE WHEN l.status = 'overdue' THEN 1 END) AS overdue_count
+     FROM loans l
+     WHERE l.sacco_id = $1 AND l.member_id = $2 AND l.status IN ('active','overdue')`,
+    [saccoId, memberId]
+  );
+  const totalOutstanding = Number(activeLoansResult.rows[0].total_outstanding);
+  const overdueCount = Number(activeLoansResult.rows[0].overdue_count);
+
+  if (overdueCount > 0) {
+    return { eligible: false, reason: 'You have an overdue loan. Please clear it before requesting another loan.', max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+  }
+
+  const amountRequested = Number(requestedAmount || 0);
+  if (totalOutstanding + amountRequested > maxEligible) {
+    const remaining = Math.max(0, maxEligible - totalOutstanding);
+    return {
+      eligible: remaining > 0 ? false : false,
+      reason: totalOutstanding > 0
+        ? `Your existing loan balance (${totalOutstanding.toLocaleString()} UGX) plus requested amount exceeds your maximum eligible (${maxEligible.toLocaleString()} UGX). You can borrow up to ${remaining.toLocaleString()} UGX more.`
+        : `Requested amount exceeds your maximum eligible amount (${maxEligible.toLocaleString()} UGX - ${currentMultiplier}x your confirmed savings)`,
+      max_eligible_amount: maxEligible,
+      remaining_eligible: remaining,
+      total_savings: totalSavings,
+      savings_multiplier: currentMultiplier,
+    };
   }
 
   // Rule 6: Pending Requests
@@ -133,8 +170,10 @@ export async function checkLoanEligibility(saccoId, memberId, requestedAmount = 
 
   return {
     eligible: true,
-    reason: `Eligible to borrow up to ${maxEligible.toLocaleString()} UGX (${currentMultiplier}x your confirmed savings)`,
+    reason: `Eligible to borrow up to ${(maxEligible - totalOutstanding).toLocaleString()} UGX`,
     max_eligible_amount: maxEligible,
+    remaining_eligible: maxEligible - totalOutstanding,
+    total_outstanding: totalOutstanding,
     total_savings: totalSavings,
     savings_multiplier: currentMultiplier,
   };

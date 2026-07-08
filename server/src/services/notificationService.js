@@ -32,8 +32,9 @@ export async function markAllAsRead(saccoId, userId) {
   return { message: 'All notifications marked as read' };
 }
 
-export async function createNotification(saccoId, userId, title, message, type = 'info', data = {}) {
-  const { rows } = await query(
+export async function createNotification(saccoId, userId, title, message, type = 'info', data = {}, db = query) {
+  const runner = typeof db === 'function' ? { query: db } : db;
+  const { rows } = await runner.query(
     `INSERT INTO notifications (sacco_id, user_id, title, message, type, data) 
      VALUES ($1, $2, $3, $4, $5, $6) 
      RETURNING *`,

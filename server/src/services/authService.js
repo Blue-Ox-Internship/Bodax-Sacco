@@ -111,6 +111,24 @@ export async function requestPasswordReset(saccoCode, identifier) {
      VALUES ($1, $2, 'pending')`,
     [user.sacco_id, user.member_id]
   );
+
+  // Notify all active Treasurers in this SACCO
+  const { rows: treasurers } = await query(
+    `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id
+     WHERE u.sacco_id = $1 AND r.code = 'TREASURER' AND u.is_active = true`,
+    [user.sacco_id]
+  );
+  const memberName = user.full_name || user.phone_number || user.number_plate || 'A member';
+  const memberIdentifier = user.phone_number || user.number_plate || '';
+  for (const t of treasurers) {
+    await createNotification(
+      user.sacco_id,
+      t.id,
+      'Password Reset Requested',
+      `${memberName} (${memberIdentifier}) has requested a password reset. Please verify their identity and process the request from the Members panel.`,
+      'password_reset'
+    );
+  }
 }
 
 export async function changePassword(userId, currentPassword, newPassword) {
