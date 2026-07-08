@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { transaction } from '../config/db.js';
 import { query } from '../config/db.js';
 import { AppError } from '../utils/AppError.js';
+import { createNotification } from './notificationService.js';
 
 function memberLoginEmail(phoneNumber) {
   const compactPhone = phoneNumber.replace(/\s+/g, '');
@@ -44,8 +45,8 @@ export async function createMember(saccoId, payload) {
   return transaction(async (client) => {
     const { rows } = await client.query(
       `INSERT INTO members
-        (sacco_id, member_number, full_name, phone_number, number_plate, national_id, stage, next_of_kin, next_of_kin_phone, registration_date, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10, CURRENT_DATE),COALESCE($11, 'active'))
+        (sacco_id, member_number, full_name, phone_number, number_plate, national_id, stage, next_of_kin, next_of_kin_phone, registration_date, status, photo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10, CURRENT_DATE),COALESCE($11, 'active'),$12)
        RETURNING *`,
       [
         saccoId,
@@ -59,6 +60,7 @@ export async function createMember(saccoId, payload) {
         payload.next_of_kin_phone || null,
         payload.registration_date || null,
         payload.status || 'active',
+        payload.photo || null,
       ],
     );
 
@@ -84,6 +86,7 @@ export async function updateMember(saccoId, id, payload) {
          next_of_kin = COALESCE($8, next_of_kin),
          next_of_kin_phone = COALESCE($9, next_of_kin_phone),
          status = COALESCE($10, status),
+         photo = COALESCE($11, photo),
          updated_at = NOW()
      WHERE sacco_id = $1 AND id = $2
      RETURNING *`,
@@ -98,6 +101,7 @@ export async function updateMember(saccoId, id, payload) {
       payload.next_of_kin,
       payload.next_of_kin_phone,
       payload.status,
+      payload.photo,
     ],
   );
   return rows[0];
@@ -176,6 +180,25 @@ export async function reviewPasswordResetRequest(saccoId, requestId, action, rev
     if (status === 'approved') {
       if (!newPassword) throw new AppError('New password is required to approve the request', 400);
       await setMemberCredentials(saccoId, request.member_id, newPassword, client);
+    }
+
+    // Notify the member that their request was processed
+    const { rows: memberRows } = await client.query(
+      'SELECT user_id, full_name FROM members WHERE id = $1',
+      [request.member_id]
+    );
+    if (memberRows[0]?.user_id) {
+      await createNotification(
+        saccoId,
+        memberRows[0].user_id,
+        status === 'approved' ? 'Password Reset Approved' : 'Password Reset Rejected',
+        status === 'approved'
+          ? 'Your password reset request has been approved. You can now log in with your new password.'
+          : 'Your password reset request was rejected. Please contact the Treasurer if you believe this is an error.',
+        'password_reset',
+        {},
+        client
+      );
     }
 
     return { status, message: `Request ${status}` };

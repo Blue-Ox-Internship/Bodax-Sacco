@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, DollarSign, CreditCard, TrendingUp, AlertTriangle, CheckCircle, Clock, ArrowUpRight } from 'lucide-react';
-import { useApi } from '../../hooks/useApi.js';
+import { useDelayedAsync } from '../../hooks/useDelayedAsync.js';
+import api from '../../api/client.js';
 import { money } from '../../utils/format.js';
 import { LoadingRetry } from '../../components/LoadingSpinner.jsx';
 
@@ -44,15 +46,30 @@ function ActionCard({ to, label, sub, icon: Icon, color = '#0d9488' }) {
 }
 
 export default function TreasurerDashboard() {
-  const { data, loading, error, onRetry } = useApi('/reports/dashboard/treasurer', {});
-  const overdue = useApi('/reports/overdue-loans', []);
+  const [dashData, setDashData] = useState({});
+  const [overdueData, setOverdueData] = useState([]);
 
-  const retryAll = () => { onRetry(); overdue.onRetry(); };
+  async function loadAll() {
+    const [dashRes, overdueRes] = await Promise.all([
+      api.get('/reports/dashboard/treasurer'),
+      api.get('/reports/overdue-loans'),
+    ]);
+    setDashData(dashRes.data);
+    setOverdueData(overdueRes.data);
+  }
+
+  const { loading, error, onRetry } = useDelayedAsync(loadAll, [], {
+    delay: 200,
+    errorMessage: 'Failed to load treasurer dashboard',
+  });
+
+  const data = dashData;
+  const overdueList = overdueData;
 
   const today = new Date().toLocaleDateString('en-UG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
-    <LoadingRetry loading={loading || overdue.loading} error={error || overdue.error} onRetry={retryAll}>
+    <LoadingRetry loading={loading} error={error} onRetry={onRetry}>
       <div style={{ display: 'grid', gap: 24 }}>
 
         {/* Header */}
@@ -93,12 +110,12 @@ export default function TreasurerDashboard() {
           </div>
         )}
 
-        {overdue.data.length > 0 && (
+        {overdueList.length > 0 && (
           <div style={{ background: 'linear-gradient(135deg,#fef2f2,#fee2e2)', border: '1px solid #fecaca', borderRadius: 14, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ background: '#fecaca', borderRadius: 10, padding: 8 }}><AlertTriangle size={18} color="#dc2626" /></div>
               <div>
-                <div style={{ fontWeight: 700, color: '#dc2626' }}>{overdue.data.length} Overdue Loan{overdue.data.length !== 1 ? 's' : ''}</div>
+                <div style={{ fontWeight: 700, color: '#dc2626' }}>{overdueList.length} Overdue Loan{overdueList.length !== 1 ? 's' : ''}</div>
                 <div style={{ fontSize: '0.8rem', color: '#991b1b' }}>Members are past their repayment date</div>
               </div>
             </div>
@@ -120,13 +137,13 @@ export default function TreasurerDashboard() {
           </div>
 
           {/* Overdue loans */}
-          {overdue.data.length > 0 && (
+          {overdueList.length > 0 && (
             <div style={{ background: '#fff', borderRadius: 16, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <h2 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <AlertTriangle size={16} /> Overdue Loans
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[...overdue.data].sort((a, b) => b.days_overdue - a.days_overdue).slice(0, 5).map((loan, i) => (
+                {[...overdueList].sort((a, b) => b.days_overdue - a.days_overdue).slice(0, 5).map((loan, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fecaca' }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#0f172a' }}>{loan.full_name}</div>

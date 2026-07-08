@@ -54,6 +54,18 @@ export async function listDepositNotifications(saccoId, status) {
   return rows;
 }
 
+export async function listMyDepositNotifications(saccoId, memberId) {
+  const { rows } = await query(
+    `SELECT id, amount, transaction_id, notes, status, created_at, reviewed_at
+     FROM deposit_notifications
+     WHERE sacco_id = $1 AND member_id = $2
+     ORDER BY created_at DESC
+     LIMIT 20`,
+    [saccoId, memberId]
+  );
+  return rows;
+}
+
 export async function reviewDeposit(saccoId, notificationId, action, reviewedBy) {
   return transaction(async (client) => {
     const { rows } = await client.query(

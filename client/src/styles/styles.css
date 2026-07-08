@@ -228,6 +228,16 @@ select {
   box-shadow: var(--shadow-sm);
 }
 
+.sidebar a.active svg {
+  color: var(--primary-hover);
+  stroke: var(--primary-hover);
+}
+
+.sidebar a:hover svg {
+  color: #0f172a;
+  stroke: #0f172a;
+}
+
 .logout {
   justify-content: center;
   cursor: pointer;

@@ -149,7 +149,7 @@ export default function MemberLoans() {
                 error={errors.due_date}
                 required
               />
-              <Button disabled={submitting || !eligibility?.eligible}>{submitting ? 'Submitting...' : 'Submit loan request'}</Button>
+              <Button disabled={submitting}>{submitting ? 'Submitting...' : 'Submit loan request'}</Button>
             </form>
           </Panel>
 
