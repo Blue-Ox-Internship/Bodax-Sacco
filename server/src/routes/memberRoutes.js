@@ -8,6 +8,10 @@ const router = Router();
 
 router.get('/', authorize('TREASURER', 'CHAIRMAN'), controller.listMembers);
 router.post('/', authorize('TREASURER'), validate(memberSchema), controller.createMember);
+
+router.get('/password-resets', authorize('TREASURER'), controller.listPasswordResetRequests);
+router.patch('/password-resets/:id', authorize('TREASURER'), controller.reviewPasswordResetRequest);
+
 router.get('/:id', authorize('TREASURER', 'CHAIRMAN'), validate(idParamSchema), controller.getMember);
 router.patch('/:id', authorize('TREASURER'), validate(memberUpdateSchema), controller.updateMember);
 router.patch('/:id/credentials', authorize('TREASURER'), validate(memberCredentialsSchema), controller.setMemberCredentials);

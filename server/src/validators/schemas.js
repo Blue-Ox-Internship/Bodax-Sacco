@@ -6,6 +6,7 @@ const money = z.coerce.number({ required_error: 'Amount is required', invalid_ty
 
 export const loginSchema = z.object({
   body: z.object({
+    sacco_code: z.string({ required_error: 'SACCO Code is required' }).min(2, 'SACCO Code must be at least 2 characters'),
     identifier: z.string().min(3, 'Identifier must be at least 3 characters').optional(),
     email: z.string().email('Enter a valid email address, e.g. user@example.com').optional(),
     password: z.string({ required_error: 'Password is required' }).min(6, 'Password must be at least 6 characters'),
@@ -20,6 +21,7 @@ export const memberSchema = z.object({
     member_number: z.string({ required_error: 'Member number is required' }).min(2, 'Enter a valid member number, e.g. M001'),
     full_name: z.string({ required_error: 'Full name is required' }).min(2, 'Enter a valid full name, e.g. John Doe'),
     phone_number: z.string({ required_error: 'Phone number is required' }).min(7, 'Enter a valid phone number, e.g. 0772123456'),
+    number_plate: z.string().optional(),
     email: z.string().email('Enter a valid email address, e.g. user@example.com').optional(),
     national_id: z.string().optional(),
     stage: z.string({ required_error: 'Stage is required' }).min(2, 'Enter a valid stage, e.g. Central Market'),
@@ -73,6 +75,14 @@ export const savingSchema = z.object({
     transaction_date: date.optional(),
     notes: z.string().optional(),
     confirmed: z.boolean().optional(),
+  }),
+});
+
+export const depositNotificationSchema = z.object({
+  body: z.object({
+    amount: money,
+    transaction_id: z.string().optional(),
+    notes: z.string().optional(),
   }),
 });
 

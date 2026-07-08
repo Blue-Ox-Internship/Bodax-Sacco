@@ -1,7 +1,13 @@
 import { query, transaction } from '../config/db.js';
 import { AppError } from '../utils/AppError.js';
 
-const LOAN_SAVINGS_MULTIPLIER = 3;
+export const ELIGIBILITY_RULES = {
+  MIN_MEMBERSHIP_DAYS: 30, // Must be registered for at least 30 days
+  MIN_SAVINGS_TRANSACTIONS: 3, // Must have saved at least 3 distinct times
+  BASE_SAVINGS_MULTIPLIER: 3, // Standard multiplier
+  GOOD_HISTORY_MULTIPLIER: 4, // Multiplier if they have completed loans on time
+  POOR_HISTORY_MULTIPLIER: 1.5, // Multiplier if they have previously paid loans late
+};
 
 function calculateLoan({ principal, interest_rate = 10, installment_count = 4 }) {
   const interestAmount = Number(principal) * (Number(interest_rate) / 100);
@@ -13,119 +19,141 @@ function calculateLoan({ principal, interest_rate = 10, installment_count = 4 })
   };
 }
 
-export async function refreshOverdueLoans() {
+export async function refreshOverdueLoans(saccoId) {
   await query(
     `UPDATE loans l SET status = 'overdue', updated_at = NOW()
-     WHERE l.status = 'active'
+     WHERE l.sacco_id = $1
+       AND l.status = 'active'
        AND l.due_date < CURRENT_DATE
        AND l.total_payable > COALESCE(
-         (SELECT SUM(amount) FROM loan_repayments r WHERE r.loan_id = l.id), 0
+         (SELECT SUM(amount) FROM loan_repayments r WHERE r.loan_id = l.id AND r.sacco_id = $1), 0
        )`,
+    [saccoId]
   );
 }
 
-export async function checkLoanEligibility(memberId, requestedAmount = null, options = {}) {
-  const memberResult = await query('SELECT status FROM members WHERE id = $1', [memberId]);
+export async function checkLoanEligibility(saccoId, memberId, requestedAmount = null, options = {}) {
+  const memberResult = await query(
+    `SELECT status, registration_date, 
+            CURRENT_DATE - registration_date AS days_registered
+     FROM members WHERE sacco_id = $1 AND id = $2`, 
+    [saccoId, memberId]
+  );
   const member = memberResult.rows[0];
   if (!member) throw new AppError('Member not found', 404);
 
   const savingsResult = await query(
-    `SELECT GREATEST(
+    `SELECT 
+       GREATEST(
+         COALESCE((
+           SELECT SUM(amount) FROM savings_transactions
+           WHERE sacco_id = $1 AND member_id = $2 AND confirmed = true
+         ), 0) - COALESCE((
+           SELECT SUM(amount) FROM withdrawals
+           WHERE sacco_id = $1 AND member_id = $2
+         ), 0),
+         0
+       ) AS total,
        COALESCE((
-         SELECT SUM(amount) FROM savings_transactions
-         WHERE member_id = $1 AND confirmed = true
-       ), 0) - COALESCE((
-         SELECT SUM(amount) FROM withdrawals
-         WHERE member_id = $1
-       ), 0),
-       0
-     ) AS total`,
-    [memberId],
+         SELECT COUNT(*) FROM savings_transactions
+         WHERE sacco_id = $1 AND member_id = $2 AND confirmed = true
+       ), 0) AS transaction_count
+    `,
+    [saccoId, memberId],
   );
   const totalSavings = Number(savingsResult.rows[0].total);
-  const maxEligible = totalSavings * LOAN_SAVINGS_MULTIPLIER;
+  const savingsTransactionsCount = Number(savingsResult.rows[0].transaction_count);
 
-  if (member.status !== 'active') {
-    return {
-      eligible: false,
-      reason: 'Your member account is not active',
-      max_eligible_amount: maxEligible,
-      total_savings: totalSavings,
-      savings_multiplier: LOAN_SAVINGS_MULTIPLIER,
-    };
+  // Analyze Repayment History
+  const historyResult = await query(
+    `SELECT 
+       COUNT(*) AS total_past_loans,
+       COUNT(CASE WHEN (SELECT MAX(payment_date) FROM loan_repayments r WHERE r.loan_id = l.id) > l.due_date THEN 1 END) AS late_past_loans
+     FROM loans l
+     WHERE l.sacco_id = $1 AND l.member_id = $2 AND l.status = 'completed'`,
+    [saccoId, memberId]
+  );
+  const pastLoans = Number(historyResult.rows[0].total_past_loans);
+  const latePastLoans = Number(historyResult.rows[0].late_past_loans);
+
+  let currentMultiplier = ELIGIBILITY_RULES.BASE_SAVINGS_MULTIPLIER;
+  if (pastLoans > 0) {
+    if (latePastLoans === 0) {
+      currentMultiplier = ELIGIBILITY_RULES.GOOD_HISTORY_MULTIPLIER; // Reward good history
+    } else if (latePastLoans >= pastLoans / 2) {
+      currentMultiplier = ELIGIBILITY_RULES.POOR_HISTORY_MULTIPLIER; // Penalize bad history
+    }
   }
 
-  const activeLoans = await listLoans({ memberId });
+  const maxEligible = totalSavings * currentMultiplier;
+
+  // Rule 1: Member Status
+  if (member.status !== 'active') {
+    return { eligible: false, reason: 'Your member account is not active', max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+  }
+
+  // Rule 2: Membership Duration
+  if (member.days_registered < ELIGIBILITY_RULES.MIN_MEMBERSHIP_DAYS) {
+    return { eligible: false, reason: `Must be a registered member for at least ${ELIGIBILITY_RULES.MIN_MEMBERSHIP_DAYS} days`, max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+  }
+
+  // Rule 3: Savings Consistency
+  if (savingsTransactionsCount < ELIGIBILITY_RULES.MIN_SAVINGS_TRANSACTIONS) {
+    return { eligible: false, reason: `Must have at least ${ELIGIBILITY_RULES.MIN_SAVINGS_TRANSACTIONS} confirmed savings transactions`, max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+  }
+
+  // Rule 4: Total Savings
+  if (totalSavings <= 0) {
+    return { eligible: false, reason: 'You need confirmed savings before applying for a loan', max_eligible_amount: 0, total_savings: totalSavings, savings_multiplier: currentMultiplier };
+  }
+
+  // Rule 5: Active Loans
+  const activeLoans = await listLoans({ saccoId, memberId });
   const hasActiveLoan = activeLoans.some((loan) => ['active', 'overdue'].includes(loan.status));
   if (hasActiveLoan) {
-    return {
-      eligible: false,
-      reason: 'You already have an active or overdue loan',
-      max_eligible_amount: maxEligible,
-      total_savings: totalSavings,
-      savings_multiplier: LOAN_SAVINGS_MULTIPLIER,
-    };
+    return { eligible: false, reason: 'You already have an active or overdue loan', max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
   }
 
-  const pendingParams = [memberId];
-  let pendingSql = `SELECT id FROM loan_requests WHERE member_id = $1 AND status = 'pending'`;
+  // Rule 6: Pending Requests
+  const pendingParams = [saccoId, memberId];
+  let pendingSql = `SELECT id FROM loan_requests WHERE sacco_id = $1 AND member_id = $2 AND status = 'pending'`;
   if (options.excludeRequestId) {
     pendingParams.push(options.excludeRequestId);
     pendingSql += ` AND id <> $${pendingParams.length}`;
   }
   const pendingRequest = await query(pendingSql, pendingParams);
   if (pendingRequest.rows.length) {
-    return {
-      eligible: false,
-      reason: 'You already have a pending loan request',
-      max_eligible_amount: maxEligible,
-      total_savings: totalSavings,
-      savings_multiplier: LOAN_SAVINGS_MULTIPLIER,
-    };
+    return { eligible: false, reason: 'You already have a pending loan request', max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
   }
 
-  if (totalSavings <= 0) {
-    return {
-      eligible: false,
-      reason: 'You need confirmed savings before applying for a loan',
-      max_eligible_amount: 0,
-      total_savings: totalSavings,
-      savings_multiplier: LOAN_SAVINGS_MULTIPLIER,
-    };
-  }
-
+  // Rule 7: Requested Amount vs Max Eligible
   if (requestedAmount !== null && Number(requestedAmount) > maxEligible) {
-    return {
-      eligible: false,
-      reason: `Requested amount exceeds your maximum eligible amount (${maxEligible.toLocaleString()} UGX - ${LOAN_SAVINGS_MULTIPLIER}x your confirmed savings)`,
-      max_eligible_amount: maxEligible,
-      total_savings: totalSavings,
-      savings_multiplier: LOAN_SAVINGS_MULTIPLIER,
-    };
+    return { eligible: false, reason: `Requested amount exceeds your maximum eligible amount (${maxEligible.toLocaleString()} UGX - ${currentMultiplier}x your confirmed savings)`, max_eligible_amount: maxEligible, total_savings: totalSavings, savings_multiplier: currentMultiplier };
   }
 
   return {
     eligible: true,
-    reason: `Eligible to borrow up to ${maxEligible.toLocaleString()} UGX (${LOAN_SAVINGS_MULTIPLIER}x your confirmed savings)`,
+    reason: `Eligible to borrow up to ${maxEligible.toLocaleString()} UGX (${currentMultiplier}x your confirmed savings)`,
     max_eligible_amount: maxEligible,
     total_savings: totalSavings,
-    savings_multiplier: LOAN_SAVINGS_MULTIPLIER,
+    savings_multiplier: currentMultiplier,
   };
 }
 
-export async function createLoanRequest(payload) {
-  const eligibility = await checkLoanEligibility(payload.member_id, payload.requested_amount);
+export async function createLoanRequest(saccoId, payload) {
+  const eligibility = await checkLoanEligibility(saccoId, payload.member_id, payload.requested_amount);
   if (!eligibility.eligible) {
     throw new AppError(eligibility.reason, 400);
   }
 
   const { rows } = await query(
     `INSERT INTO loan_requests
-      (member_id, requested_amount, purpose, installment_count, due_date,
+      (sacco_id, member_id, requested_amount, purpose, installment_count, due_date,
        eligibility_status, eligibility_reason, max_eligible_amount)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING *`,
     [
+      saccoId,
       payload.member_id,
       payload.requested_amount,
       payload.purpose || null,
@@ -139,9 +167,9 @@ export async function createLoanRequest(payload) {
   return { request: rows[0], eligibility };
 }
 
-export async function listLoanRequests({ status, memberId } = {}) {
-  const params = [];
-  const filters = [];
+export async function listLoanRequests({ saccoId, status, memberId } = {}) {
+  const params = [saccoId];
+  const filters = ['lr.sacco_id = $1'];
   if (status) {
     params.push(status);
     filters.push(`lr.status = $${params.length}`);
@@ -150,16 +178,16 @@ export async function listLoanRequests({ status, memberId } = {}) {
     params.push(memberId);
     filters.push(`lr.member_id = $${params.length}`);
   }
-  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  const where = `WHERE ${filters.join(' AND ')}`;
   const { rows } = await query(
     `SELECT lr.*, m.full_name, m.member_number,
             GREATEST(
               COALESCE((
                 SELECT SUM(s.amount) FROM savings_transactions s
-                WHERE s.member_id = lr.member_id AND s.confirmed = true
+                WHERE s.sacco_id = lr.sacco_id AND s.member_id = lr.member_id AND s.confirmed = true
               ), 0) - COALESCE((
                 SELECT SUM(w.amount) FROM withdrawals w
-                WHERE w.member_id = lr.member_id
+                WHERE w.sacco_id = lr.sacco_id AND w.member_id = lr.member_id
               ), 0),
               0
             ) AS total_savings
@@ -172,9 +200,9 @@ export async function listLoanRequests({ status, memberId } = {}) {
   return rows;
 }
 
-export async function reviewLoanRequest(id, action, reviewedBy, notes = null) {
+export async function reviewLoanRequest(saccoId, id, action, reviewedBy, notes = null) {
   return transaction(async (client) => {
-    const found = await client.query('SELECT * FROM loan_requests WHERE id = $1 FOR UPDATE', [id]);
+    const found = await client.query('SELECT * FROM loan_requests WHERE sacco_id = $1 AND id = $2 FOR UPDATE', [saccoId, id]);
     const request = found.rows[0];
     if (!request) throw new AppError('Loan request not found', 404);
     if (request.status !== 'pending') throw new AppError('Request has already been reviewed', 409);
@@ -184,7 +212,7 @@ export async function reviewLoanRequest(id, action, reviewedBy, notes = null) {
         throw new AppError('Cannot approve an ineligible loan request', 400);
       }
 
-      const eligibility = await checkLoanEligibility(request.member_id, request.requested_amount, { excludeRequestId: id });
+      const eligibility = await checkLoanEligibility(saccoId, request.member_id, request.requested_amount, { excludeRequestId: id });
       if (!eligibility.eligible) {
         throw new AppError(eligibility.reason, 400);
       }
@@ -196,11 +224,12 @@ export async function reviewLoanRequest(id, action, reviewedBy, notes = null) {
 
       const loanResult = await client.query(
         `INSERT INTO loans
-          (member_id, issued_by, principal, interest_rate, interest_amount, total_payable,
+          (sacco_id, member_id, issued_by, principal, interest_rate, interest_amount, total_payable,
            installment_count, installment_amount, due_date, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
+          saccoId,
           request.member_id,
           reviewedBy,
           request.requested_amount,
@@ -217,11 +246,11 @@ export async function reviewLoanRequest(id, action, reviewedBy, notes = null) {
 
       const reviewed = await client.query(
         `UPDATE loan_requests
-         SET status = 'approved', reviewed_by = $2, reviewed_at = NOW(),
-             loan_id = $3, updated_at = NOW()
-         WHERE id = $1
+         SET status = 'approved', reviewed_by = $3, reviewed_at = NOW(),
+             loan_id = $4, updated_at = NOW()
+         WHERE sacco_id = $1 AND id = $2
          RETURNING *`,
-        [id, reviewedBy, loan.id],
+        [saccoId, id, reviewedBy, loan.id],
       );
 
       return { request: reviewed.rows[0], loan };
@@ -229,17 +258,17 @@ export async function reviewLoanRequest(id, action, reviewedBy, notes = null) {
 
     const reviewed = await client.query(
       `UPDATE loan_requests
-       SET status = 'rejected', reviewed_by = $2, reviewed_at = NOW(), updated_at = NOW()
-       WHERE id = $1
+       SET status = 'rejected', reviewed_by = $3, reviewed_at = NOW(), updated_at = NOW()
+       WHERE sacco_id = $1 AND id = $2
        RETURNING *`,
-      [id, reviewedBy],
+      [saccoId, id, reviewedBy],
     );
     return { request: reviewed.rows[0], loan: null };
   });
 }
 
-export async function issueLoan(payload, issuedBy) {
-  const eligibility = await checkLoanEligibility(payload.member_id, payload.principal);
+export async function issueLoan(saccoId, payload, issuedBy) {
+  const eligibility = await checkLoanEligibility(saccoId, payload.member_id, payload.principal);
   if (!eligibility.eligible) {
     throw new AppError(eligibility.reason, 400);
   }
@@ -247,11 +276,12 @@ export async function issueLoan(payload, issuedBy) {
   const calculated = calculateLoan(payload);
   const { rows } = await query(
     `INSERT INTO loans
-      (member_id, issued_by, principal, interest_rate, interest_amount, total_payable,
+      (sacco_id, member_id, issued_by, principal, interest_rate, interest_amount, total_payable,
        installment_count, installment_amount, issued_date, due_date, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, CURRENT_DATE),$10,$11)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10, CURRENT_DATE),$11,$12)
      RETURNING *`,
     [
+      saccoId,
       payload.member_id,
       issuedBy,
       payload.principal,
@@ -268,15 +298,15 @@ export async function issueLoan(payload, issuedBy) {
   return rows[0];
 }
 
-export async function refreshLoanStatus(client, loanId) {
+export async function refreshLoanStatus(saccoId, client, loanId) {
   const { rows } = await client.query(
     `SELECT l.id, l.total_payable, l.due_date, l.status,
             COALESCE(SUM(r.amount), 0) AS paid
      FROM loans l
-     LEFT JOIN loan_repayments r ON r.loan_id = l.id
-     WHERE l.id = $1
+     LEFT JOIN loan_repayments r ON r.loan_id = l.id AND r.sacco_id = $1
+     WHERE l.sacco_id = $1 AND l.id = $2
      GROUP BY l.id`,
-    [loanId],
+    [saccoId, loanId],
   );
   const loan = rows[0];
   if (!loan) throw new AppError('Loan not found', 404);
@@ -284,33 +314,33 @@ export async function refreshLoanStatus(client, loanId) {
   const balance = Number(loan.total_payable) - Number(loan.paid);
   const status = balance <= 0 ? 'completed' : new Date(loan.due_date) < new Date() ? 'overdue' : 'active';
 
-  await client.query('UPDATE loans SET status = $2, updated_at = NOW() WHERE id = $1', [loanId, status]);
+  await client.query('UPDATE loans SET status = $3, updated_at = NOW() WHERE sacco_id = $1 AND id = $2', [saccoId, loanId, status]);
   return { ...loan, remaining_balance: Math.max(balance, 0), status };
 }
 
-export async function recordRepayment(payload, recordedBy) {
+export async function recordRepayment(saccoId, payload, recordedBy) {
   return transaction(async (client) => {
-    const loanResult = await client.query('SELECT * FROM loans WHERE id = $1', [payload.loan_id]);
+    const loanResult = await client.query('SELECT * FROM loans WHERE sacco_id = $1 AND id = $2', [saccoId, payload.loan_id]);
     const loan = loanResult.rows[0];
     if (!loan) throw new AppError('Loan not found', 404);
 
     const repayment = await client.query(
-      `INSERT INTO loan_repayments (loan_id, member_id, recorded_by, amount, payment_date, notes)
-       VALUES ($1,$2,$3,$4,COALESCE($5, CURRENT_DATE),$6)
+      `INSERT INTO loan_repayments (sacco_id, loan_id, member_id, recorded_by, amount, payment_date, notes)
+       VALUES ($1,$2,$3,$4,$5,COALESCE($6, CURRENT_DATE),$7)
        RETURNING *`,
-      [payload.loan_id, loan.member_id, recordedBy, payload.amount, payload.payment_date || null, payload.notes || null],
+      [saccoId, payload.loan_id, loan.member_id, recordedBy, payload.amount, payload.payment_date || null, payload.notes || null],
     );
 
-    const summary = await refreshLoanStatus(client, payload.loan_id);
+    const summary = await refreshLoanStatus(saccoId, client, payload.loan_id);
     return { repayment: repayment.rows[0], loan: summary };
   });
 }
 
-export async function listLoans({ memberId, status } = {}) {
-  await refreshOverdueLoans();
+export async function listLoans({ saccoId, memberId, status } = {}) {
+  await refreshOverdueLoans(saccoId);
 
-  const params = [];
-  const filters = [];
+  const params = [saccoId];
+  const filters = ['l.sacco_id = $1'];
   if (memberId) {
     params.push(memberId);
     filters.push(`l.member_id = $${params.length}`);
@@ -319,14 +349,14 @@ export async function listLoans({ memberId, status } = {}) {
     params.push(status);
     filters.push(`l.status = $${params.length}`);
   }
-  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  const where = `WHERE ${filters.join(' AND ')}`;
   const { rows } = await query(
     `SELECT l.*, m.full_name, m.member_number,
             COALESCE(SUM(r.amount), 0) AS amount_paid,
             GREATEST(l.total_payable - COALESCE(SUM(r.amount), 0), 0) AS remaining_balance
      FROM loans l
      JOIN members m ON m.id = l.member_id
-     LEFT JOIN loan_repayments r ON r.loan_id = l.id
+     LEFT JOIN loan_repayments r ON r.loan_id = l.id AND r.sacco_id = l.sacco_id
      ${where}
      GROUP BY l.id, m.full_name, m.member_number
      ORDER BY l.created_at DESC`,
@@ -335,7 +365,7 @@ export async function listLoans({ memberId, status } = {}) {
   return rows;
 }
 
-export async function memberActiveLoan(memberId) {
-  const loans = await listLoans({ memberId });
+export async function memberActiveLoan(saccoId, memberId) {
+  const loans = await listLoans({ saccoId, memberId });
   return loans.find((loan) => ['active', 'overdue'].includes(loan.status)) || null;
 }

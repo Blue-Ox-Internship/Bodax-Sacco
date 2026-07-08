@@ -19,12 +19,19 @@ export default function Members() {
   const [credErrors, setCredErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [credSubmitting, setCredSubmitting] = useState(false);
-  const [form, setForm] = useState({ member_number: '', full_name: '', phone_number: '', national_id: '', stage: 'Mbarara Central Stage', next_of_kin: '', password: '' });
+  const [form, setForm] = useState({ member_number: '', full_name: '', phone_number: '', number_plate: '', national_id: '', stage: 'Mbarara Central Stage', next_of_kin: '', password: '', photo: '' });
   const [credentials, setCredentials] = useState({ member_id: '', password: '' });
+  const [resetRequests, setResetRequests] = useState([]);
+  const [reviewForm, setReviewForm] = useState({ id: null, action: 'approve', password: '' });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   async function load() {
-    const { data } = await api.get(`/members?search=${encodeURIComponent(search)}`);
-    setMembers(data.data);
+    const [membersRes, resetsRes] = await Promise.all([
+      api.get(`/members?search=${encodeURIComponent(search)}`),
+      api.get('/members/password-resets')
+    ]);
+    setMembers(membersRes.data.data);
+    setResetRequests(resetsRes.data);
   }
 
   const { loading, error: loadError, onRetry } = useDelayedAsync(load, [search], {
@@ -61,8 +68,8 @@ export default function Members() {
     setSubmitting(true);
     try {
       await api.post('/members', form);
-      setMessage('Member saved. They can log in using their phone number.');
-      setForm({ ...form, member_number: '', full_name: '', phone_number: '', national_id: '', next_of_kin: '', password: '' });
+      setMessage('Member saved. They can log in using their phone number or number plate.');
+      setForm({ ...form, member_number: '', full_name: '', phone_number: '', number_plate: '', national_id: '', next_of_kin: '', password: '', photo: '' });
       setErrors({});
       onRetry();
     } catch (err) {
@@ -95,8 +102,51 @@ export default function Members() {
     }
   }
 
+  async function handleReviewReset(event, reqId) {
+    event.preventDefault();
+    setMessage('');
+    setApiError('');
+    if (reviewForm.action === 'approve' && reviewForm.password.length < 6) {
+      setApiError('New password must be at least 6 characters');
+      return;
+    }
+
+    setReviewSubmitting(true);
+    try {
+      await api.patch(`/members/password-resets/${reqId}`, {
+        action: reviewForm.action,
+        password: reviewForm.action === 'approve' ? reviewForm.password : undefined
+      });
+      setMessage(`Password reset request ${reviewForm.action}d successfully.`);
+      setReviewForm({ id: null, action: 'approve', password: '' });
+      onRetry();
+    } catch (err) {
+      setApiError(err.response?.data?.message || 'Failed to process request.');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  }
+
   function update(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handlePhotoUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setApiError('Photo must be smaller than 2MB');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setForm((current) => ({ ...current, photo: e.target.result }));
+    };
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -135,6 +185,14 @@ export default function Members() {
             required
           />
           <FormField
+            label="Number plate"
+            value={form.number_plate}
+            onChange={(e) => update('number_plate', e.target.value.toUpperCase())}
+            placeholder="e.g. UAB 123C"
+            maxLength="10"
+            error={errors.number_plate}
+          />
+          <FormField
             label="National ID"
             value={form.national_id}
             onChange={(e) => update('national_id', e.target.value.toUpperCase())}
@@ -154,6 +212,21 @@ export default function Members() {
             maxLength="128"
             error={errors.password}
           />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label htmlFor="photo" style={{ fontSize: '0.875rem', fontWeight: 600 }}>Member Photo (optional)</label>
+            <input 
+              type="file" 
+              id="photo" 
+              accept="image/*" 
+              onChange={handlePhotoUpload} 
+              style={{ padding: '8px', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)' }}
+            />
+            {form.photo && (
+              <div style={{ marginTop: '8px' }}>
+                <img src={form.photo} alt="Preview" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '50%' }} />
+              </div>
+            )}
+          </div>
           <Button disabled={submitting}>{submitting ? 'Saving...' : 'Save member'}</Button>
         </form>
       </Panel>
@@ -185,14 +258,83 @@ export default function Members() {
           <Button disabled={credSubmitting}>{credSubmitting ? 'Updating...' : 'Update password'}</Button>
         </form>
       </Panel>
+
+      <Panel title="Password Reset Requests">
+        <DataTable
+          rows={resetRequests}
+          columns={[
+            {
+              key: 'member',
+              label: 'Member',
+              render: (req) => (
+                <>
+                  {req.full_name} <br/>
+                  <small>{req.phone_number} | {req.member_number}</small>
+                </>
+              )
+            },
+            {
+              key: 'requested_at',
+              label: 'Requested At',
+              render: (req) => new Date(req.created_at).toLocaleString()
+            },
+            {
+              key: 'action',
+              label: 'Action',
+              render: (req) => (
+                reviewForm.id === req.id ? (
+                  <form onSubmit={(e) => handleReviewReset(e, req.id)} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select value={reviewForm.action} onChange={e => setReviewForm({ ...reviewForm, action: e.target.value })}>
+                      <option value="approve">Approve</option>
+                      <option value="reject">Reject</option>
+                    </select>
+                    {reviewForm.action === 'approve' && (
+                      <input 
+                        type="password" 
+                        placeholder="New Password" 
+                        value={reviewForm.password}
+                        onChange={e => setReviewForm({ ...reviewForm, password: e.target.value })}
+                        required
+                        minLength={6}
+                      />
+                    )}
+                    <Button type="submit" disabled={reviewSubmitting}>Submit</Button>
+                    <button type="button" onClick={() => setReviewForm({ id: null, action: 'approve', password: '' })} className="btn-secondary">Cancel</button>
+                  </form>
+                ) : (
+                  <Button onClick={() => setReviewForm({ id: req.id, action: 'approve', password: '' })}>Review</Button>
+                )
+              )
+            }
+          ]}
+          empty="No pending password reset requests."
+        />
+      </Panel>
+
       <Panel title="Search members" action={<SearchBox value={search} onChange={setSearch} placeholder="Name, phone, number" />}>
         <LoadingRetry loading={loading} error={loadError} onRetry={onRetry}>
           <DataTable
             rows={members}
             columns={[
               { key: 'member_number', label: 'Number' },
-              { key: 'full_name', label: 'Name' },
+              { 
+                key: 'full_name', 
+                label: 'Name',
+                render: (m) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {m.photo ? (
+                      <img src={m.photo} alt={m.full_name} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '50%' }} />
+                    ) : (
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                        {m.full_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span>{m.full_name}</span>
+                  </div>
+                )
+              },
               { key: 'phone_number', label: 'Phone' },
+              { key: 'number_plate', label: 'Plate' },
               { key: 'stage', label: 'Stage' },
               { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
             ]}

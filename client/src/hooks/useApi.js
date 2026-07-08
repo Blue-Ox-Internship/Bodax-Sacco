@@ -9,35 +9,26 @@ export function useApi(path, fallback) {
   const load = useCallback(() => {
     if (!path) return;
     let mounted = true;
-    
-    // Delay setting loading state to true by 1 second
-    const loadingTimeout = setTimeout(() => {
-      if (mounted) setLoading(true);
-    }, 1000);
 
+    setLoading(true);
     setError('');
     
     api
       .get(path)
       .then((response) => {
         if (mounted) {
-          clearTimeout(loadingTimeout);
           setLoading(false);
           setData(response.data);
         }
       })
       .catch((err) => {
         if (mounted) {
-          clearTimeout(loadingTimeout);
           setLoading(false);
           setError(err.response?.data?.message || 'Failed to load data');
         }
       });
       
-    return () => {
-      mounted = false;
-      clearTimeout(loadingTimeout);
-    };
+    return () => { mounted = false; };
   }, [path]);
 
   useEffect(() => {

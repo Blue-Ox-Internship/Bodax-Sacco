@@ -97,14 +97,14 @@ async function verifyTreasurerDashboard(token) {
   const api = (await apiGet('/api/reports/dashboard/treasurer', token)).body;
   const [r] = await db(`
     SELECT
-      (SELECT COUNT(*)::int FROM members WHERE status='active') AS active_members,
-      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date=CURRENT_DATE AND confirmed=true) AS daily_collections,
-      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$1 AND confirmed=true) AS weekly_collections,
-      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$2 AND confirmed=true) AS monthly_collections,
-      (SELECT COUNT(*)::int FROM withdrawal_requests WHERE status='pending') AS pending_withdrawals,
-      (SELECT COUNT(*)::int FROM loan_requests WHERE status='pending') AS pending_loan_requests,
-      (SELECT COUNT(*)::int FROM loans WHERE status='active') AS active_loans
-  `, [weekStart(), monthStart()]);
+      (SELECT COUNT(*)::int FROM members WHERE status='active' AND sacco_id=$3) AS active_members,
+      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date=CURRENT_DATE AND confirmed=true AND sacco_id=$3) AS daily_collections,
+      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$1 AND confirmed=true AND sacco_id=$3) AS weekly_collections,
+      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$2 AND confirmed=true AND sacco_id=$3) AS monthly_collections,
+      (SELECT COUNT(*)::int FROM withdrawal_requests WHERE status='pending' AND sacco_id=$3) AS pending_withdrawals,
+      (SELECT COUNT(*)::int FROM loan_requests WHERE status='pending' AND sacco_id=$3) AS pending_loan_requests,
+      (SELECT COUNT(*)::int FROM loans WHERE status='active' AND sacco_id=$3) AS active_loans
+  `, [weekStart(), monthStart(), '00000000-0000-0000-0000-000000000001']);
   checkInt('active_members',         r.active_members,         api.active_members);
   check   ('daily_collections',      r.daily_collections,      api.daily_collections);
   check   ('weekly_collections',     r.weekly_collections,     api.weekly_collections);
@@ -120,22 +120,22 @@ async function verifyChairmanDashboard(token) {
   const api = (await apiGet('/api/reports/dashboard/chairman', token)).body;
   const [r] = await db(`
     SELECT
-      (SELECT COUNT(*)::int FROM members) AS members,
+      (SELECT COUNT(*)::int FROM members WHERE sacco_id=$3) AS members,
       (SELECT GREATEST(
-         COALESCE((SELECT SUM(amount) FROM savings_transactions WHERE confirmed=true),0)
-         -COALESCE((SELECT SUM(amount) FROM withdrawals),0),0)) AS total_savings,
-      (SELECT COUNT(*)::int FROM loans WHERE status='active') AS active_loans,
+         COALESCE((SELECT SUM(amount) FROM savings_transactions WHERE confirmed=true AND sacco_id=$3),0)
+         -COALESCE((SELECT SUM(amount) FROM withdrawals WHERE sacco_id=$3),0),0)) AS total_savings,
+      (SELECT COUNT(*)::int FROM loans WHERE status='active' AND sacco_id=$3) AS active_loans,
       (SELECT COALESCE(SUM(b),0) FROM (
          SELECT GREATEST(l.total_payable-COALESCE(SUM(r.amount),0),0) AS b
          FROM loans l LEFT JOIN loan_repayments r ON r.loan_id=l.id
-         WHERE l.status IN ('active','overdue') GROUP BY l.id) x) AS outstanding_loan_balance,
+         WHERE l.status IN ('active','overdue') AND l.sacco_id=$3 GROUP BY l.id) x) AS outstanding_loan_balance,
       (SELECT COALESCE(SUM(b),0) FROM (
          SELECT GREATEST(l.total_payable-COALESCE(SUM(r.amount),0),0) AS b
          FROM loans l LEFT JOIN loan_repayments r ON r.loan_id=l.id
-         WHERE l.status='overdue' OR (l.status='active' AND l.due_date<CURRENT_DATE) GROUP BY l.id) x) AS loan_arrears,
-      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$1 AND confirmed=true) AS weekly_collections,
-      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$2 AND confirmed=true) AS monthly_collections
-  `, [weekStart(), monthStart()]);
+         WHERE (l.status='overdue' OR (l.status='active' AND l.due_date<CURRENT_DATE)) AND l.sacco_id=$3 GROUP BY l.id) x) AS loan_arrears,
+      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$1 AND confirmed=true AND sacco_id=$3) AS weekly_collections,
+      (SELECT COALESCE(SUM(amount),0) FROM savings_transactions WHERE transaction_date>=$2 AND confirmed=true AND sacco_id=$3) AS monthly_collections
+  `, [weekStart(), monthStart(), '00000000-0000-0000-0000-000000000001']);
   checkInt('members',                  r.members,                  api.members);
   check   ('total_savings',            r.total_savings,            api.total_savings);
   checkInt('active_loans',             r.active_loans,             api.active_loans);
@@ -165,9 +165,9 @@ async function verifyAnalytics(token) {
     const topMember = api.topSavers[0].member_number;
     const [dbTop] = await db(`
       SELECT m.member_number,
-             GREATEST(COALESCE(SUM(s.amount),0)-COALESCE((SELECT SUM(w.amount) FROM withdrawals w WHERE w.member_id=m.id),0),0) AS total
-      FROM members m LEFT JOIN savings_transactions s ON s.member_id=m.id AND s.confirmed=true
-      WHERE m.member_number=$1
+             GREATEST(COALESCE(SUM(s.amount),0)-COALESCE((SELECT SUM(w.amount) FROM withdrawals w WHERE w.member_id=m.id AND w.sacco_id='00000000-0000-0000-0000-000000000001'),0),0) AS total
+      FROM members m LEFT JOIN savings_transactions s ON s.member_id=m.id AND s.confirmed=true AND s.sacco_id='00000000-0000-0000-0000-000000000001'
+      WHERE m.member_number=$1 AND m.sacco_id='00000000-0000-0000-0000-000000000001'
       GROUP BY m.member_number, m.id
     `, [topMember]);
     if (dbTop) check(`topSavers[0] total (${topMember})`, dbTop.total, api.topSavers[0].total);
@@ -192,14 +192,14 @@ async function verifyAnalytics(token) {
   else { console.error('  ❌  expenditureSummary: invalid'); failed++; }
 
   // Cross-check income.savings_collected
-  const [dbInc] = await db(`SELECT COALESCE(SUM(amount),0) AS sc FROM savings_transactions WHERE confirmed=true`);
+  const [dbInc] = await db(`SELECT COALESCE(SUM(amount),0) AS sc FROM savings_transactions WHERE confirmed=true AND sacco_id='00000000-0000-0000-0000-000000000001'`);
   check('income.savings_collected vs DB', dbInc.sc, api.income.savings_collected);
 }
 
 // ── 4. PASSWORD HASHING ─────────────────────────────────────────────────────
 async function verifyPasswords() {
   console.log('\n━━━ Password Hashing Check ━━━');
-  const rows = await db(`SELECT email, password_hash FROM users`);
+  const rows = await db(`SELECT email, password_hash FROM users WHERE sacco_id='00000000-0000-0000-0000-000000000001'`);
   let allHashed = true;
   for (const row of rows) {
     if (!row.password_hash.startsWith('$2')) {
@@ -289,7 +289,7 @@ async function main() {
     await verifyRateLimiting();
     await verifyHealthEndpoint();
   } catch (err) {
-    console.error('\nFATAL:', err.message);
+    console.error('\nFATAL:', err.stack || err);
   } finally {
     await pool.end();
   }

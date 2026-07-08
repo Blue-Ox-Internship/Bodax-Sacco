@@ -1,15 +1,18 @@
-import { changePassword, login, register } from '../services/authService.js';
+import { changePassword, login, requestPasswordReset } from '../services/authService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const loginController = asyncHandler(async (req, res) => {
   const identifier = req.validated.body.identifier || req.validated.body.email;
-  const result = await login(identifier, req.validated.body.password);
+  const result = await login(req.validated.body.sacco_code, identifier, req.validated.body.password);
   res.json(result);
 });
 
-export const signupController = asyncHandler(async (req, res) => {
-  const result = await register(req.validated.body);
-  res.status(201).json(result);
+export const forgotPasswordController = asyncHandler(async (req, res) => {
+  const { sacco_code, identifier } = req.body;
+  if (!sacco_code) return res.status(400).json({ message: 'SACCO Code is required' });
+  if (!identifier) return res.status(400).json({ message: 'Identifier is required' });
+  await requestPasswordReset(sacco_code, identifier);
+  res.json({ message: 'Password reset request submitted successfully' });
 });
 
 export const meController = asyncHandler(async (req, res) => {
