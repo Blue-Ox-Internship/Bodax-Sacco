@@ -1186,12 +1186,17 @@ button,
   }
 
   .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
     min-height: 100vh;
     border-right: 1px solid var(--line);
     border-bottom: 0;
     align-content: start;
     padding: 28px 24px;
     box-shadow: none;
+    transform: none !important;
+    overflow-y: auto;
   }
 
   .sidebar nav {
@@ -1212,6 +1217,262 @@ button,
 
   .content {
     padding: 40px;
+  }
+
+  /* Hide mobile-only elements on desktop */
+  .menu-toggle {
+    display: none !important;
+  }
+
+  .sidebar-close-btn {
+    display: none !important;
+  }
+
+  .topbar-brand {
+    display: none !important;
+  }
+
+  /* Restore topbar layout on desktop */
+  .topbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+  }
+}
+
+/* ── Mobile sidebar overlay ─────────────────────────────────────────── */
+.sidebar-overlay {
+  display: none;
+}
+
+/* Mobile topbar brand — shown only on mobile */
+.topbar-brand {
+  display: none;
+}
+
+/* Hamburger toggle — hidden on desktop */
+.menu-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+  color: #0f172a;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  flex-shrink: 0;
+}
+
+/* Sidebar close button — hidden on desktop */
+.sidebar-close-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #475569;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 859px) {
+  /* Overlay backdrop */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 99;
+  }
+
+  /* Sidebar slides in from left as a drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 280px;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+    border-bottom: none;
+    padding: 24px 20px;
+    display: grid;
+    gap: 16px;
+    align-content: start;
+  }
+
+  .sidebar--open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.15);
+  }
+
+  /* Nav links stack vertically in drawer */
+  .sidebar nav {
+    display: grid;
+    gap: 4px;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .sidebar a,
+  .logout {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+    font-size: 0.95rem;
+  }
+
+  .logout {
+    margin-top: 16px;
+  }
+
+  /* Show hamburger and close buttons */
+  .menu-toggle {
+    display: inline-flex;
+  }
+
+  .sidebar-close-btn {
+    display: inline-flex;
+  }
+
+  /* Show brand in topbar on mobile */
+  .topbar-brand {
+    display: block;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--primary-hover);
+  }
+
+  /* Topbar layout on mobile */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: flex-start;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  /* Stack pages with less gap on mobile */
+  .page-stack {
+    gap: 16px;
+  }
+
+  /* Panels: reduce padding on mobile */
+  .panel {
+    padding: 16px;
+  }
+
+  /* Content padding on mobile */
+  .content {
+    padding: 16px 12px 24px;
+  }
+
+  /* Login card padding on mobile */
+  .login-card {
+    padding: 24px 20px;
+  }
+
+  /* Form grid: single column on mobile */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stat grid: 2 columns on small screens */
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Smaller h1 on mobile */
+  h1 {
+    font-size: 1.4rem;
+  }
+
+  /* Modal: full width on mobile */
+  .modal-content {
+    padding: 20px 16px;
+    margin: 0 4px;
+  }
+
+  /* Details grid: single column on mobile */
+  .details {
+    grid-template-columns: 1fr;
+    gap: 8px 0;
+  }
+
+  .details dt {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Modal actions: stack on mobile */
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+  }
+
+  /* Toast: full width on mobile */
+  .dashboard-toast {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  /* Notice banner: stack on mobile */
+  .notice-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Stat grid: single column on very small screens */
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Row actions: stack on very small screens */
+  .row-actions {
+    flex-direction: column;
+  }
+
+  .row-actions .btn {
+    width: 100%;
+  }
+
+  /* Quick grid: single column on very small screens */
+  .quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Receipt: reduce padding */
+  .receipt {
+    padding: 20px 14px;
+  }
+
+  /* Receipt row: stack label and value */
+  .receipt .receipt-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .receipt .receipt-row span:last-child {
+    text-align: left;
+    color: var(--primary-hover);
   }
 }
 
