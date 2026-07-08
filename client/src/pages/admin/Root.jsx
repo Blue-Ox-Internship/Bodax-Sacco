@@ -7,6 +7,7 @@ export default function SuperAdminRoot() {
   const [error, setError] = useState('');
   
   const [newSaccoName, setNewSaccoName] = useState('');
+  const [newSaccoCode, setNewSaccoCode] = useState('');
   
   const [userForm, setUserForm] = useState({ saccoId: '', email: '', password: '', role_code: 'TREASURER' });
 
@@ -50,9 +51,10 @@ export default function SuperAdminRoot() {
     try {
       await apiFetch('', {
         method: 'POST',
-        body: JSON.stringify({ name: newSaccoName }),
+        body: JSON.stringify({ name: newSaccoName, code: newSaccoCode }),
       });
       setNewSaccoName('');
+      setNewSaccoCode('');
       fetchSaccos();
     } catch (err) {
       setError(err.message);
@@ -116,7 +118,7 @@ export default function SuperAdminRoot() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>Name</th>
+                  <th style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>Name & Code</th>
                   <th style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>Status</th>
                   <th style={{ borderBottom: '1px solid #000', textAlign: 'left' }}>Action</th>
                 </tr>
@@ -124,7 +126,7 @@ export default function SuperAdminRoot() {
               <tbody>
                 {saccos.map(s => (
                   <tr key={s.id}>
-                    <td style={{ padding: '0.5rem 0' }}>{s.name} <br/><small style={{color:'#666'}}>{s.id}</small></td>
+                    <td style={{ padding: '0.5rem 0' }}>{s.name} <br/><strong>Code: {s.code}</strong><br/><small style={{color:'#666'}}>{s.id}</small></td>
                     <td>{s.status}</td>
                     <td>
                       {s.status === 'active' ? (
@@ -146,6 +148,13 @@ export default function SuperAdminRoot() {
               placeholder="SACCO Name" 
               value={newSaccoName} 
               onChange={e => setNewSaccoName(e.target.value)} 
+              style={{ padding: '0.5rem', width: '200px', marginRight: '1rem' }}
+            />
+            <input 
+              required
+              placeholder="SACCO Code (e.g., BODAX)" 
+              value={newSaccoCode} 
+              onChange={e => setNewSaccoCode(e.target.value.toUpperCase())} 
               style={{ padding: '0.5rem', width: '200px', marginRight: '1rem' }}
             />
             <button type="submit" style={{ padding: '0.5rem 1rem' }}>Create</button>

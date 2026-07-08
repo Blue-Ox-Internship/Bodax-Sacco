@@ -3,14 +3,15 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const loginController = asyncHandler(async (req, res) => {
   const identifier = req.validated.body.identifier || req.validated.body.email;
-  const result = await login(identifier, req.validated.body.password);
+  const result = await login(req.validated.body.sacco_code, identifier, req.validated.body.password);
   res.json(result);
 });
 
 export const forgotPasswordController = asyncHandler(async (req, res) => {
-  const identifier = req.body.identifier;
+  const { sacco_code, identifier } = req.body;
+  if (!sacco_code) return res.status(400).json({ message: 'SACCO Code is required' });
   if (!identifier) return res.status(400).json({ message: 'Identifier is required' });
-  await requestPasswordReset(identifier);
+  await requestPasswordReset(sacco_code, identifier);
   res.json({ message: 'Password reset request submitted successfully' });
 });
 

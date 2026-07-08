@@ -19,7 +19,7 @@ export async function getUserById(id) {
   return rows[0];
 }
 
-export async function login(identifier, password) {
+export async function login(saccoCode, identifier, password) {
   // Normalize identifier
   let value = identifier.trim().toLowerCase();
   
@@ -35,10 +35,11 @@ export async function login(identifier, password) {
 
   const { rows } = await query(
     `${userSelect}
-     WHERE lower(u.email) = $1
-        OR m.phone_number = $2
-        OR lower(replace(m.number_plate, ' ', '')) = $3`,
-    [value, phoneValue, strippedValue],
+     JOIN saccos s ON s.id = u.sacco_id
+     WHERE s.code = $1 AND (lower(u.email) = $2
+        OR m.phone_number = $3
+        OR lower(replace(m.number_plate, ' ', '')) = $4)`,
+    [saccoCode.trim().toUpperCase(), value, phoneValue, strippedValue],
   );
   const user = rows[0];
 
@@ -81,7 +82,7 @@ export async function login(identifier, password) {
   return { token, user };
 }
 
-export async function requestPasswordReset(identifier) {
+export async function requestPasswordReset(saccoCode, identifier) {
   let value = identifier.trim().toLowerCase();
   const strippedValue = value.replace(/\s+/g, '');
   let phoneValue = value;
@@ -92,10 +93,11 @@ export async function requestPasswordReset(identifier) {
 
   const { rows } = await query(
     `${userSelect}
-     WHERE lower(u.email) = $1
-        OR m.phone_number = $2
-        OR lower(replace(m.number_plate, ' ', '')) = $3`,
-    [value, phoneValue, strippedValue],
+     JOIN saccos s ON s.id = u.sacco_id
+     WHERE s.code = $1 AND (lower(u.email) = $2
+        OR m.phone_number = $3
+        OR lower(replace(m.number_plate, ' ', '')) = $4)`,
+    [saccoCode.trim().toUpperCase(), value, phoneValue, strippedValue],
   );
   const user = rows[0];
 

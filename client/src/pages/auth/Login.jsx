@@ -5,6 +5,7 @@ import FormField from '../../components/FormField.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function Login() {
+  const [saccoCode, setSaccoCode] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,7 +18,7 @@ export default function Login() {
     setLoading(true);
       setError('');
     try {
-      await login(identifier, password);
+      await login(saccoCode, identifier, password);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed');
@@ -34,6 +35,9 @@ export default function Login() {
           <span>Mbarara Boda Boda savings and loans</span>
         </div>
         {error && <p className="alert">{error}</p>}
+        <div>
+          <FormField label="SACCO Code" value={saccoCode} onChange={(event) => setSaccoCode(event.target.value)} required />
+        </div>
         <div>
           <FormField label="Phone number or Number Plate" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
         </div>

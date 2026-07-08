@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { BarChart3, CreditCard, Home, LogOut, Users, WalletCards, Bell, Send } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import NotificationCenter from '../components/NotificationCenter.jsx';
 
 const nav = {
   MEMBER: [
@@ -51,7 +52,7 @@ export default function AppLayout() {
         <nav>
           {items.map(([to, label, Icon]) => (
             <NavLink key={to} to={to} end={to === '/'}>
-              <Icon size={19} />
+              <Icon size={19} style={{ pointerEvents: 'none' }} />
               <span>{label}</span>
             </NavLink>
           ))}
@@ -63,9 +64,12 @@ export default function AppLayout() {
       </aside>
       <main className="content">
         <header className="topbar">
-          <div>
-            <span>{user.role_name}</span>
-            <strong>{user.full_name || user.email}</strong>
+          <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto' }}>
+            <NotificationCenter />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{user.role_name}</span>
+              <strong>{user.full_name || user.email}</strong>
+            </div>
           </div>
         </header>
         <Outlet />

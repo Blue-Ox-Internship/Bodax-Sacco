@@ -30,7 +30,7 @@ export default function ConfirmDeposits() {
   async function loadData() {
     const [membersRes, notifsRes] = await Promise.all([
       api.get('/members?limit=100'),
-      api.get('/savings/deposit-notifications')
+      api.get('/deposits?status=pending')
     ]);
     setMembers(membersRes.data.data);
     setNotifications(notifsRes.data);
@@ -102,7 +102,7 @@ export default function ConfirmDeposits() {
     setApiError('');
     setReviewSubmitting(true);
     try {
-      await api.patch(`/savings/deposit-notifications/${reqId}`, { action: reviewForm.action });
+      await api.patch(`/deposits/${reqId}/review`, { action: reviewForm.action });
       setMessage(`Deposit notification ${reviewForm.action}d successfully.`);
       setReviewForm({ id: null, action: 'approve' });
       onRetry();

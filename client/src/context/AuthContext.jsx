@@ -9,8 +9,8 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : null;
   });
 
-  async function login(identifier, password) {
-    const { data } = await api.post('/auth/login', { identifier, password });
+  async function login(saccoCode, identifier, password) {
+    const { data } = await api.post('/auth/login', { sacco_code: saccoCode, identifier, password });
     localStorage.setItem('bodax_token', data.token);
     localStorage.setItem('bodax_user', JSON.stringify(data.user));
     setUser(data.user);

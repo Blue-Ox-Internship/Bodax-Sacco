@@ -4,6 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS saccos (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(160) NOT NULL,
+  code VARCHAR(30) UNIQUE NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -217,8 +218,8 @@ CREATE INDEX IF NOT EXISTS idx_deposit_notifs_sacco_status ON deposit_notificati
 CREATE INDEX IF NOT EXISTS idx_password_resets_sacco_status ON password_reset_requests(sacco_id, status);
 
 -- Seed Default SACCO
-INSERT INTO saccos (id, name)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Default Bodax SACCO')
+INSERT INTO saccos (id, name, code)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Default Bodax SACCO', 'BODAX')
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed Data (Default SACCO)

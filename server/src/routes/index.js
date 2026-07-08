@@ -8,6 +8,7 @@ import savingsRoutes from './savingsRoutes.js';
 import withdrawalRoutes from './withdrawalRoutes.js';
 import saccoRoutes from './saccoRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
+import depositRoutes from './depositRoutes.js';
 import { superAdminAuth } from '../middleware/superAdminAuth.js';
 
 const router = Router();
@@ -19,6 +20,7 @@ router.use('/loans', authenticate, loanRoutes);
 router.use('/withdrawals', authenticate, withdrawalRoutes);
 router.use('/reports', authenticate, reportRoutes);
 router.use('/notifications', authenticate, notificationRoutes);
+router.use('/deposits', authenticate, depositRoutes);
 router.use('/admin/saccos', superAdminAuth, saccoRoutes);
 
 export default router;

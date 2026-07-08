@@ -6,6 +6,7 @@ const money = z.coerce.number({ required_error: 'Amount is required', invalid_ty
 
 export const loginSchema = z.object({
   body: z.object({
+    sacco_code: z.string({ required_error: 'SACCO Code is required' }).min(2, 'SACCO Code must be at least 2 characters'),
     identifier: z.string().min(3, 'Identifier must be at least 3 characters').optional(),
     email: z.string().email('Enter a valid email address, e.g. user@example.com').optional(),
     password: z.string({ required_error: 'Password is required' }).min(6, 'Password must be at least 6 characters'),
