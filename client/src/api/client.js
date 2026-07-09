@@ -15,4 +15,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle expired/invalid sessions globally: clear storage and redirect to login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Only redirect if it's an auth failure, not a deliberate login attempt
+      const url = error.config?.url || '';
+      if (!url.includes('/auth/login')) {
+        localStorage.removeItem('bodax_token');
+        localStorage.removeItem('bodax_user');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

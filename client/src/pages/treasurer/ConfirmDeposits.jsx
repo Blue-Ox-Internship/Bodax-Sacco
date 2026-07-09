@@ -88,6 +88,7 @@ export default function ConfirmDeposits() {
         notes: '',
       });
       setErrors({});
+      onRetry();
       setSelectedMemberSummary(null);
     } catch (err) {
       setApiError(err.response?.data?.message || 'Failed to confirm deposit. Please try again.');

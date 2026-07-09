@@ -1,5 +1,6 @@
 import { query, transaction } from '../config/db.js';
 import { weekStart, monthStart, yearStart } from '../utils/dates.js';
+import { createNotification } from './notificationService.js';
 
 export async function recordSaving(saccoId, payload, recordedBy) {
   const confirmed = payload.confirmed !== false;
@@ -10,7 +11,33 @@ export async function recordSaving(saccoId, payload, recordedBy) {
     [saccoId, payload.member_id, recordedBy, payload.amount, payload.transaction_date || null, payload.notes || null, confirmed],
   );
 
-  return rows[0];
+  const saving = rows[0];
+
+  // Notify the member when a confirmed saving is recorded
+  if (confirmed) {
+    try {
+      const memberResult = await query(
+        'SELECT user_id, full_name FROM members WHERE sacco_id = $1 AND id = $2',
+        [saccoId, payload.member_id]
+      );
+      const member = memberResult.rows[0];
+      if (member?.user_id) {
+        const amount = Number(payload.amount).toLocaleString('en-UG');
+        await createNotification(
+          saccoId,
+          member.user_id,
+          'Savings Confirmed',
+          `Your savings of UGX ${amount} have been recorded and confirmed by the Treasurer.`,
+          'savings'
+        );
+      }
+    } catch (notifErr) {
+      // Non-fatal: log but do not fail the savings record
+      console.error('Failed to send savings notification:', notifErr.message);
+    }
+  }
+
+  return saving;
 }
 
 export async function memberSavingsSummary(saccoId, memberId) {
@@ -113,6 +140,26 @@ export async function reviewDepositNotification(saccoId, id, action, reviewedBy)
         [saccoId, notification.member_id, reviewedBy, notification.amount, `Approved Deposit Notif: ${notification.transaction_id || ''}`]
       );
     }
+
+    // Notify the member of the deposit review outcome
+    try {
+      const memberResult = await client.query(
+        'SELECT user_id, full_name FROM members WHERE id = $1',
+        [notification.member_id]
+      );
+      const member = memberResult.rows[0];
+      if (member?.user_id) {
+        const amount = Number(notification.amount).toLocaleString('en-UG');
+        const title = status === 'approved' ? 'Deposit Approved' : 'Deposit Rejected';
+        const message = status === 'approved'
+          ? `Your deposit of UGX ${amount} has been approved and added to your savings.`
+          : `Your deposit notification of UGX ${amount} was reviewed and rejected. Contact the Treasurer for details.`;
+        await createNotification(saccoId, member.user_id, title, message, 'deposit', {}, client);
+      }
+    } catch (notifErr) {
+      console.error('Failed to send deposit review notification:', notifErr.message);
+    }
+
     return { status, message: `Deposit ${status}` };
   });
 }
