@@ -22,7 +22,13 @@ export async function authenticate(req, _res, next) {
     req.saccoId = user.sacco_id;
     next();
   } catch (error) {
-    next(error.name === 'JsonWebTokenError' ? new AppError('Invalid token', 401) : error);
+    if (error.name === 'JsonWebTokenError') {
+      next(new AppError('Invalid token', 401));
+    } else if (error.name === 'TokenExpiredError') {
+      next(new AppError('Your session has expired. Please log in again.', 401));
+    } else {
+      next(error);
+    }
   }
 }
 

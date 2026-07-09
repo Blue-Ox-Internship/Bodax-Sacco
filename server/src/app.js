@@ -12,7 +12,21 @@ const app = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: env.nodeEnv === 'development' ? true : env.clientUrl,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, curl)
+      if (!origin) return callback(null, true);
+      // In development allow everything
+      if (env.nodeEnv === 'development') return callback(null, true);
+      // In production: allow if CLIENT_URL matches, or allow all if CLIENT_URL not set
+      if (!env.clientUrl || origin === env.clientUrl) return callback(null, true);
+      // Also allow any subdomain of the same root domain
+      try {
+        const allowed = new URL(env.clientUrl).hostname;
+        const incoming = new URL(origin).hostname;
+        if (incoming === allowed || incoming.endsWith(`.${allowed}`)) return callback(null, true);
+      } catch { /* ignore parse errors */ }
+      callback(new Error('CORS: origin not allowed'));
+    },
     credentials: true,
   }),
 );

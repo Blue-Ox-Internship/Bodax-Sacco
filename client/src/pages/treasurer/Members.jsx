@@ -43,9 +43,9 @@ export default function Members() {
       member_number: memberNumber(form.member_number, 'Member number'),
       full_name: fullName(form.full_name, 'Full name'),
       phone_number: ugPhoneNumber(form.phone_number, 'Phone number'),
-      national_id: ugNationalId(form.national_id, 'National ID'),
+      national_id: form.national_id ? ugNationalId(form.national_id, 'National ID') : null,
       stage: requiredField(form.stage, 'Stage'),
-      password: passwordStrength(form.password, 'Login password'),
+      password: form.password ? passwordStrength(form.password, 'Login password') : null,
     });
   }
 
