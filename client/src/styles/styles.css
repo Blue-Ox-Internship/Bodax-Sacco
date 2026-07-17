@@ -978,7 +978,7 @@ button,
   background: var(--danger-light);
 }
 
-@media (max-width: 479px) {
+@media (max-width: 768px) {
   .table-wrap {
     border: none;
     background: transparent;
@@ -1587,5 +1587,23 @@ button,
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+/* Accessible tap targets for boda boda riders on mobile */
+@media (max-width: 768px) {
+  .field input,
+  .field select,
+  .inline-form input,
+  .search-box input,
+  .btn,
+  .logout,
+  .sidebar a,
+  .menu-toggle {
+    min-height: 48px !important;
+  }
+  
+  .lang-select {
+    min-height: 38px !important;
   }
 }

@@ -7,6 +7,7 @@ import { LoadingRetry } from '../../components/LoadingSpinner.jsx';
 import { money, shortDate } from '../../utils/format.js';
 import api from '../../api/client.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useTranslation } from '../../context/LanguageContext.jsx';
 import { useDelayedAsync } from '../../hooks/useDelayedAsync.js';
 
 function MetricCard({ icon: Icon, label, value, sub, tone = 'default', to }) {
@@ -67,6 +68,7 @@ function QuickAction({ to, label, sub, icon: Icon }) {
 
 export default function MemberDashboard() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [data, setData] = useState({});
   const [statement, setStatement] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -128,32 +130,98 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Welcome back, {user?.full_name?.split(' ')[0]} 👋</h1>
-            <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.875rem' }}>Member #{user?.member_number} {lastUpdated && `· Last updated ${lastUpdated.toLocaleTimeString()}`}</p>
+        {/* Header / Profile Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
+          borderRadius: '16px',
+          padding: '24px',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '20px',
+          flexWrap: 'wrap',
+          boxShadow: 'var(--shadow-md)',
+        }}>
+          {user?.photo ? (
+            <img
+              src={user.photo}
+              alt={user.full_name}
+              style={{
+                width: '72px',
+                height: '72px',
+                objectFit: 'cover',
+                borderRadius: '50%',
+                border: '3px solid rgba(255,255,255,0.4)',
+                boxShadow: 'var(--shadow-sm)'
+              }}
+            />
+          ) : (
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.2)',
+              border: '3px solid rgba(255,255,255,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontWeight: 800,
+              fontSize: '1.8rem',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
+              {user?.full_name ? user.full_name.charAt(0).toUpperCase() : '?'}
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.025em' }}>
+              {t('welcome')}, {user?.full_name} 👋
+            </h1>
+            <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.85)', fontSize: '0.9rem', fontWeight: 500 }}>
+              {t('member_no')} #{user?.member_number} {user?.number_plate ? `· ${user.number_plate}` : ''} {user?.phone_number ? `· ${user.phone_number}` : ''}
+            </p>
+            {lastUpdated && (
+              <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem' }}>
+                {t('last_updated')} {lastUpdated.toLocaleTimeString()}
+              </p>
+            )}
           </div>
-          <Link to="/notifications" style={{ background: '#f0fdfa', border: '1px solid #ccfbf1', borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 600, color: '#0d9488' }}>
-            <Bell size={15} /> Notifications
+          <Link to="/notifications" style={{
+            background: 'rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            borderRadius: '10px',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            color: '#fff',
+            transition: 'all 0.2s',
+            backdropFilter: 'blur(4px)'
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            <Bell size={16} /> {t('notifications')}
           </Link>
         </div>
 
         {/* Metrics grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16 }}>
-          <MetricCard icon={Wallet} label="Total Savings" value={money(data.total_savings)} sub="Confirmed balance" />
-          <MetricCard icon={TrendingUp} label="This Month" value={money(data.month_savings)} sub="Month-to-date" tone="info" />
-          <MetricCard icon={TrendingUp} label="This Week" value={money(data.week_savings)} sub="Week deposits" tone="neutral" />
-          <MetricCard icon={CreditCard} label="Loan Balance" value={money(data.active_loan_balance)} sub="Outstanding" tone="warn" />
+          <MetricCard icon={Wallet} label={t('total_savings')} value={money(data.total_savings)} sub={t('confirmed_bal')} />
+          <MetricCard icon={TrendingUp} label={t('this_month')} value={money(data.month_savings)} sub={t('month_to_date')} tone="info" />
+          <MetricCard icon={TrendingUp} label={t('this_week')} value={money(data.week_savings)} sub={t('week_deposits')} tone="neutral" />
+          <MetricCard icon={CreditCard} label={t('loan_balance')} value={money(data.active_loan_balance)} sub={t('outstanding')} tone="warn" />
         </div>
 
         {/* Active loan banner */}
         {activeLoan && (
           <div style={{ background: 'linear-gradient(135deg,#1e293b 0%,#0f172a 100%)', borderRadius: 16, padding: '20px 24px', color: '#fff', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 16, boxShadow: '0 8px 30px rgba(15,23,42,0.2)' }}>
             <div>
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Loan</div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('active_loan')}</div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, margin: '4px 0', letterSpacing: '-0.02em' }}>{money(activeLoan.remaining_balance)}</div>
-              <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Remaining · Due {shortDate(activeLoan.due_date)} · {money(activeLoan.installment_amount)}/installment</div>
+              <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{t('remaining')} · {t('due')} {shortDate(activeLoan.due_date)} · {money(activeLoan.installment_amount)}/{t('installment')}</div>
             </div>
             <StatusBadge status={activeLoan.status} />
           </div>
@@ -162,20 +230,20 @@ export default function MemberDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 24 }}>
           {/* Quick actions */}
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <h2 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700 }}>Quick Actions</h2>
+            <h2 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700 }}>{t('quick_actions')}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <QuickAction to="/member/loans" label="Apply for Loan" sub="Check eligibility & apply" icon={CreditCard} />
-              <QuickAction to="/member/notify-deposit" label="Notify a Deposit" sub="Report mobile money payment" icon={ArrowUpRight} />
-              <QuickAction to="/member/withdraw" label="Request Withdrawal" sub="Withdraw your savings" icon={Wallet} />
-              <QuickAction to="/member/statements" label="My Statement" sub="View full history" icon={TrendingUp} />
+              <QuickAction to="/member/loans" label={t('apply_loan')} sub={t('apply_loan_sub')} icon={CreditCard} />
+              <QuickAction to="/member/notify-deposit" label={t('notify_deposit')} sub={t('notify_deposit_sub')} icon={ArrowUpRight} />
+              <QuickAction to="/member/withdraw" label={t('withdraw')} sub={t('withdraw_sub')} icon={Wallet} />
+              <QuickAction to="/member/statements" label={t('my_statement')} sub={t('my_statement_sub')} icon={TrendingUp} />
             </div>
           </div>
 
           {/* Recent transactions */}
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Recent Transactions</h2>
-              <Link to="/member/statements" style={{ fontSize: '0.8rem', color: '#0d9488', fontWeight: 600 }}>View all</Link>
+              <h2 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{t('recent_transactions')}</h2>
+              <Link to="/member/statements" style={{ fontSize: '0.8rem', color: '#0d9488', fontWeight: 600 }}>{t('view_all')}</Link>
             </div>
             {statement.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -195,7 +263,7 @@ export default function MemberDashboard() {
                 ))}
               </div>
             ) : (
-              <p style={{ color: '#64748b', textAlign: 'center', padding: '24px 0', fontSize: '0.875rem' }}>No transactions this month</p>
+              <p style={{ color: '#64748b', textAlign: 'center', padding: '24px 0', fontSize: '0.875rem' }}>{t('no_transactions')}</p>
             )}
           </div>
         </div>
@@ -204,8 +272,8 @@ export default function MemberDashboard() {
         {data.loan_requests?.length > 0 && (
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h2 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Loan Requests</h2>
-              <Link to="/member/loans" style={{ fontSize: '0.8rem', color: '#0d9488', fontWeight: 600 }}>Apply for another</Link>
+              <h2 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{t('loan_requests')}</h2>
+              <Link to="/member/loans" style={{ fontSize: '0.8rem', color: '#0d9488', fontWeight: 600 }}>{t('apply_another')}</Link>
             </div>
             <DataTable
               rows={data.loan_requests}
@@ -223,7 +291,7 @@ export default function MemberDashboard() {
         {data.loan_reminders?.length > 0 && (
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <h2 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Clock size={16} color="#f59e0b" /> Repayment Reminders
+              <Clock size={16} color="#f59e0b" /> {t('repayment_reminders')}
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {data.loan_reminders.map((r, i) => (

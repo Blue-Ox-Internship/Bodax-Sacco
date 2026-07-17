@@ -75,7 +75,7 @@ async function apiGet(path, token) {
 }
 
 async function login(email, password) {
-  const res = await apiPost('/api/auth/login', { identifier: email, password });
+  const res = await apiPost('/api/auth/login', { sacco_code: 'BODAX', identifier: email, password });
   if (res.status !== 200) throw new Error(`Login failed for ${email}: ${JSON.stringify(res.body)}`);
   return res.body.token;
 }

@@ -3,15 +3,15 @@ import { AppError } from '../utils/AppError.js';
 import bcrypt from 'bcryptjs';
 
 export async function listSaccos() {
-  const { rows } = await query('SELECT id, name, status, created_at FROM saccos ORDER BY created_at DESC');
+  const { rows } = await query('SELECT id, name, code, status, created_at FROM saccos ORDER BY created_at DESC');
   return rows;
 }
 
-export async function createSacco(name) {
+export async function createSacco(name, code) {
   return transaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO saccos (name) VALUES ($1) RETURNING *`,
-      [name]
+      `INSERT INTO saccos (name, code) VALUES ($1, $2) RETURNING *`,
+      [name, code.trim().toUpperCase()]
     );
     const sacco = rows[0];
 

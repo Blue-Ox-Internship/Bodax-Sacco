@@ -6,10 +6,14 @@ export const listSaccos = asyncHandler(async (req, res) => {
 });
 
 export const createSacco = asyncHandler(async (req, res) => {
-  if (!req.body.name) {
+  const { name, code } = req.body;
+  if (!name) {
     return res.status(400).json({ message: 'SACCO name is required' });
   }
-  res.status(201).json(await saccoService.createSacco(req.body.name));
+  if (!code) {
+    return res.status(400).json({ message: 'SACCO code is required' });
+  }
+  res.status(201).json(await saccoService.createSacco(name, code));
 });
 
 export const updateSaccoStatus = asyncHandler(async (req, res) => {

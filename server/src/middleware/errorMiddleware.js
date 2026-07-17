@@ -8,8 +8,18 @@ export function notFound(req, _res, next) {
 
 export function errorMiddleware(error, _req, res, _next) {
   const statusCode = error.statusCode || 500;
+
+  // Always log errors server-side so we can debug
+  if (statusCode >= 500) {
+    console.error('[ERROR]', statusCode, error.message, error.details || '');
+    console.error(error.stack);
+  }
+
   const response = {
-    message: statusCode === 500 ? 'Something went wrong' : error.message,
+    // In development show full message; in production hide 500 internals
+    message: (statusCode === 500 && env.nodeEnv !== 'development')
+      ? 'Something went wrong'
+      : error.message,
   };
 
   if (error.details) response.details = error.details;
@@ -17,3 +27,4 @@ export function errorMiddleware(error, _req, res, _next) {
 
   res.status(statusCode).json(response);
 }
+
