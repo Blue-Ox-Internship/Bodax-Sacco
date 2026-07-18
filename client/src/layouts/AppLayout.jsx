@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { BarChart3, CreditCard, Home, LogOut, Menu, Users, WalletCards, Bell, Send, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTranslation } from '../context/LanguageContext.jsx';
 import NotificationCenter from '../components/NotificationCenter.jsx';
 
 const nav = {
@@ -33,8 +34,19 @@ const nav = {
   ],
 };
 
+const labelKeys = {
+  'Dashboard': 'welcome',
+  'Loans': 'loan_requests',
+  'Statements': 'my_statement',
+  'Notify Deposit': 'notify_deposit',
+  'Profile': 'profile',
+  'Withdraw': 'withdraw',
+  'Notifications': 'notifications'
+};
+
 export default function AppLayout() {
   const { user, logout } = useAuth();
+  const { lang, t, changeLanguage } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -105,16 +117,19 @@ export default function AppLayout() {
           </div>
         </div>
         <nav>
-          {items.map(([to, label, Icon]) => (
-            <NavLink key={to} to={to} end={to === '/'}>
-              <Icon size={19} style={{ pointerEvents: 'none', flexShrink: 0 }} />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+          {items.map(([to, label, Icon]) => {
+            const displayLabel = labelKeys[label] ? t(labelKeys[label]) : label;
+            return (
+              <NavLink key={to} to={to} end={to === '/'}>
+                <Icon size={19} style={{ pointerEvents: 'none', flexShrink: 0 }} />
+                <span>{displayLabel}</span>
+              </NavLink>
+            );
+          })}
         </nav>
         <button className="logout" onClick={signOut}>
           <LogOut size={18} />
-          <span>Logout</span>
+          <span>{t('logout')}</span>
         </button>
       </aside>
 
@@ -134,6 +149,26 @@ export default function AppLayout() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+            <select
+              value={lang}
+              onChange={(e) => changeLanguage(e.target.value)}
+              className="lang-select"
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--line)',
+                background: '#fff',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: 'var(--primary-hover)',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="en">English</option>
+              <option value="ny">Runyankore</option>
+              <option value="lg">Luganda</option>
+            </select>
             <NotificationCenter />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{user.role_name}</span>

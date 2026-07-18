@@ -1,5 +1,10 @@
-﻿{
+{
   "name": "bodax-scripts",
   "type": "module",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0"
+  }
 }

@@ -28,8 +28,15 @@ export function maxLength(value, max, label = 'This field') {
 
 /* ── Money / numbers ────────────────────────────────────────── */
 
+function cleanNumber(value) {
+  if (typeof value === 'string') {
+    return value.replace(/,/g, '');
+  }
+  return value;
+}
+
 export function positiveAmount(value, label = 'Amount') {
-  const num = Number(value);
+  const num = Number(cleanNumber(value));
   if (isNaN(num) || num <= 0) {
     return `${label} must be greater than zero`;
   }
@@ -37,7 +44,7 @@ export function positiveAmount(value, label = 'Amount') {
 }
 
 export function minAmount(value, min, label = 'Amount') {
-  const num = Number(value);
+  const num = Number(cleanNumber(value));
   if (isNaN(num) || num < min) {
     return `${label} must be at least ${min.toLocaleString()}`;
   }
@@ -45,7 +52,7 @@ export function minAmount(value, min, label = 'Amount') {
 }
 
 export function maxAmount(value, max, label = 'Amount') {
-  const num = Number(value);
+  const num = Number(cleanNumber(value));
   if (isNaN(num) || num > max) {
     return `${label} cannot exceed ${max.toLocaleString()}`;
   }
@@ -53,7 +60,7 @@ export function maxAmount(value, max, label = 'Amount') {
 }
 
 export function positiveInteger(value, label = 'Value') {
-  const num = Number(value);
+  const num = Number(cleanNumber(value));
   if (isNaN(num) || !Number.isInteger(num) || num < 1) {
     return `${label} must be a whole number greater than zero`;
   }
@@ -61,7 +68,7 @@ export function positiveInteger(value, label = 'Value') {
 }
 
 export function percentRange(value, label = 'Rate') {
-  const num = Number(value);
+  const num = Number(cleanNumber(value));
   if (isNaN(num) || num < 0 || num > 100) {
     return `${label} must be between 0 and 100`;
   }

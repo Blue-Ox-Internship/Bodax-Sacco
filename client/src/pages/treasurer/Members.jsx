@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Button from '../../components/Button.jsx';
 import DataTable from '../../components/DataTable.jsx';
 import FormField from '../../components/FormField.jsx';
@@ -20,6 +20,7 @@ export default function Members() {
   const [submitting, setSubmitting] = useState(false);
   const [credSubmitting, setCredSubmitting] = useState(false);
   const [form, setForm] = useState({ member_number: '', full_name: '', phone_number: '', number_plate: '', national_id: '', stage: 'Mbarara Central Stage', next_of_kin: '', password: '', photo: '' });
+  const photoInputRef = useRef(null);
   const [credentials, setCredentials] = useState({ member_id: '', password: '' });
   const [resetRequests, setResetRequests] = useState([]);
   const [reviewForm, setReviewForm] = useState({ id: null, action: 'approve', password: '' });
@@ -70,6 +71,9 @@ export default function Members() {
       await api.post('/members', form);
       setMessage('Member saved. They can log in using their phone number or number plate.');
       setForm({ ...form, member_number: '', full_name: '', phone_number: '', number_plate: '', national_id: '', next_of_kin: '', password: '', photo: '' });
+      if (photoInputRef.current) {
+        photoInputRef.current.value = '';
+      }
       setErrors({});
       onRetry();
     } catch (err) {
@@ -217,6 +221,7 @@ export default function Members() {
             <input 
               type="file" 
               id="photo" 
+              ref={photoInputRef}
               accept="image/*" 
               onChange={handlePhotoUpload} 
               style={{ padding: '8px', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)' }}

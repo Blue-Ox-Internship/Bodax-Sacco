@@ -46,6 +46,35 @@ export const pool = new Pool({
   ssl: shouldUseSsl(env.databaseUrl) ? { rejectUnauthorized: false } : undefined,
 });
 
+export function handleDatabaseError(error) {
+  if (error instanceof AppError) return error;
+  
+  const detail = error?.detail || error?.message || 'Unknown database error';
+  const msgStr = error?.message || '';
+
+  if (isDbConnectivityError(error)) {
+    return new AppError(
+      'Database unavailable. Please verify your database connection settings and try again.',
+      503,
+      { detail },
+    );
+  }
+  if (error?.code === '23505') {
+    let message = 'A record with these details already exists.';
+    if (detail.includes('member_number') || msgStr.includes('member_number')) {
+      message = 'This Member number is already registered.';
+    } else if (detail.includes('phone_number') || msgStr.includes('phone_number')) {
+      message = 'This Phone number is already registered.';
+    } else if (detail.includes('email') || msgStr.includes('email')) {
+      message = 'This Email is already registered.';
+    } else if (detail.includes('number_plate') || msgStr.includes('number_plate')) {
+      message = 'This Number plate is already registered.';
+    }
+    return new AppError(message, 400, { detail });
+  }
+  return new AppError(`Database query failed: ${detail}`, 500, { detail });
+}
+
 export async function query(text, params = []) {
   const start = Date.now();
   try {
@@ -55,26 +84,7 @@ export async function query(text, params = []) {
     }
     return result;
   } catch (error) {
-    const detail = error?.message || 'Unknown database error';
-    if (isDbConnectivityError(error)) {
-      throw new AppError(
-        'Database unavailable. Please verify your database connection settings and try again.',
-        503,
-        { detail },
-      );
-    }
-    if (error?.code === '23505') {
-      let message = 'A record with these details already exists.';
-      if (detail.includes('member_number')) {
-        message = 'This Member number is already registered.';
-      } else if (detail.includes('phone_number')) {
-        message = 'This Phone number is already registered.';
-      } else if (detail.includes('email')) {
-        message = 'This Email is already registered.';
-      }
-      throw new AppError(message, 400, { detail });
-    }
-    throw new AppError(`Database query failed: ${detail}`, 500, { detail });
+    throw handleDatabaseError(error);
   }
 }
 
@@ -87,8 +97,9 @@ export async function transaction(callback) {
     return result;
   } catch (error) {
     await client.query('ROLLBACK');
-    throw error;
+    throw handleDatabaseError(error);
   } finally {
     client.release();
   }
 }
+

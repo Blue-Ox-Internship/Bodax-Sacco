@@ -2,13 +2,24 @@ import { z } from 'zod';
 
 const uuid = z.string({ required_error: 'ID is required' }).uuid('Invalid ID format');
 const date = z.string({ required_error: 'Date is required' }).regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid date format, e.g. YYYY-MM-DD');
-const money = z.coerce.number({ required_error: 'Amount is required', invalid_type_error: 'Amount must be a number' }).positive('Amount must be greater than zero');
+const emptyToUndefined = (val) => (val === '' ? undefined : val);
+
+const money = z.preprocess(
+  (val) => {
+    if (typeof val === 'string') {
+      const cleaned = val.replace(/,/g, '');
+      return cleaned === '' ? undefined : Number(cleaned);
+    }
+    return val;
+  },
+  z.number({ required_error: 'Amount is required', invalid_type_error: 'Amount must be a number' }).positive('Amount must be greater than zero')
+);
 
 export const loginSchema = z.object({
   body: z.object({
     sacco_code: z.string({ required_error: 'SACCO Code is required' }).min(2, 'SACCO Code must be at least 2 characters'),
-    identifier: z.string().min(3, 'Identifier must be at least 3 characters').optional(),
-    email: z.string().email('Enter a valid email address, e.g. user@example.com').optional(),
+    identifier: z.preprocess(emptyToUndefined, z.string().min(3, 'Identifier must be at least 3 characters').optional()),
+    email: z.preprocess(emptyToUndefined, z.string().email('Enter a valid email address, e.g. user@example.com').optional()),
     password: z.string({ required_error: 'Password is required' }).min(6, 'Password must be at least 6 characters'),
   }).refine((value) => value.identifier || value.email, {
     message: 'Phone number or email is required',
@@ -21,16 +32,16 @@ export const memberSchema = z.object({
     member_number: z.string({ required_error: 'Member number is required' }).min(2, 'Enter a valid member number, e.g. M001'),
     full_name: z.string({ required_error: 'Full name is required' }).min(2, 'Enter a valid full name, e.g. John Doe'),
     phone_number: z.string({ required_error: 'Phone number is required' }).min(7, 'Enter a valid phone number, e.g. 0772123456'),
-    number_plate: z.string().optional(),
-    email: z.string().email('Enter a valid email address, e.g. user@example.com').optional(),
-    photo: z.string().optional(),
-    national_id: z.string().optional(),
+    number_plate: z.preprocess(emptyToUndefined, z.string().optional()),
+    email: z.preprocess(emptyToUndefined, z.string().email('Enter a valid email address, e.g. user@example.com').optional()),
+    photo: z.preprocess(emptyToUndefined, z.string().optional()),
+    national_id: z.preprocess(emptyToUndefined, z.string().optional()),
     stage: z.string({ required_error: 'Stage is required' }).min(2, 'Enter a valid stage, e.g. Central Market'),
-    next_of_kin: z.string().optional(),
-    next_of_kin_phone: z.string().optional(),
+    next_of_kin: z.preprocess(emptyToUndefined, z.string().optional()),
+    next_of_kin_phone: z.preprocess(emptyToUndefined, z.string().optional()),
     registration_date: date.optional(),
     status: z.enum(['active', 'inactive'], { errorMap: () => ({ message: "Status must be 'active' or 'inactive'" }) }).optional(),
-    password: z.string().min(6, 'Password must be at least 6 characters').optional(),
+    password: z.preprocess(emptyToUndefined, z.string().min(6, 'Password must be at least 6 characters').optional()),
   }),
 });
 
